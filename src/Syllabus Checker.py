@@ -1,6 +1,13 @@
+
 from pypdf import PdfReader
 import os
 from rapidfuzz import fuzz
+
+#for sentence transformers
+from sentence_transformers import CrossEncoder
+import re
+import numpy as np
+
 
 # Ask the user to input the file path
 file_path = input("Enter the path to the PDF file: ").strip()
@@ -67,3 +74,56 @@ else:
             score += 10
 
     print(f"\nOverall score: {score}")
+
+
+############################################################################
+#by rebecca nanayakkara 10/13/2025
+#using sentence transformer cross encoder to compare queries to sentences in PDG
+#load cross-encoder model from sentence transformers
+#this model measures how semantically similar two pieces of text are
+#this imported model is small, fast, and accurate model for sentence similarity
+#source: https://pypi.org/project/sentence-transformers/
+model = CrossEncoder("cross-encoder/ms-marco-MiniLM-L6-v2")
+
+#let the user search what query they want
+query = input("\nEnter a phrase to search for in the syllabus (e.g., 'attendance policy'): ").strip()
+#if user presses enter without typing anything, stop program
+if not query:
+    raise SystemExit
+
+#split exisiting text into sentences
+#s.strip() removes extra spaces
+#then for each sentence s, len(s.split()) > 3 ensures that the sentence has at least 4 words (filters out fragments like "David J.")
+#re.search(r"[A-Za-z]{3,}", s) checks that there is at least one real word (3+ letters in a row), which avoids numbers and initials
+sentences = [
+    s.strip()
+    for s in re.split(r'(?<=[.!?])\s+', all_text)
+    if len(s.split()) > 3 and re.search(r"[A-Za-z]{3,}", s)
+    ]
+
+#compare each sentence to query
+#model expects pairs : (query,sentence)
+#both are lowercased to make case-insensitive
+scores = model.predict([(query.lower(), s.lower()) for s in sentences], show_progress_bar=False)
+
+#converts the models raw score (logits) into probabilities between 0 and 1 using the sigmoid function
+probs = 1 / (1 + np.exp(-scores))
+#combine each sentence with its similarity score in a list of tuples : [(sentence, score), ...]
+results = list(zip(sentences, probs))
+#sort sentences by similarity score in descending order (highest similarity first)
+results.sort(key=lambda x: x[1], reverse=True)
+
+#select the best match (highest score) and take its score
+best_sentence, best_score = results[0]
+
+#define a similarity threshold
+threshold = 0.35 #adjust strictness; lower = less strict, higher = more strict
+## if score is greater than 0.35, we can say that the query has found a match
+found = best_score >= threshold
+#print top results
+print("\n--- Syllabus Checker Report ---")
+print(f"Query: {query}")
+print(f"Result: {'Found!' if found else 'Missing!'} (score = {best_score:.2f})")
+
+if found:
+    print(f"Example match:\n {best_sentence.strip()}")
