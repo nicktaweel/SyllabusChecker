@@ -41,6 +41,7 @@ class SyllabusApp:
         self.status = Label(root, text="Ready", bg="black",fg="white", font=("Segoe UI", 9, "italic"))
         self.status.pack(side=BOTTOM, pady=5)
 
+    # for the actual file selection
     def select_file(self):
         path = filedialog.askopenfilename(filetypes=[("PDF files", "*.pdf")])
         if path:
