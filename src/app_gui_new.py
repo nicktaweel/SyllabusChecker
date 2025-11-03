@@ -9,29 +9,29 @@ class SyllabusApp:
         self.root = root
         self.root.title("Syllabus Analyzer")
         self.root.geometry("700x600")
-        self.root.configure(bg = "white")
+        self.root.configure(bg = "gray")
 
         self.file_path = None
 
         # Title
-        Label(root, text = "Syllabus Checker", font = ("Segoe UI", 18, "bold"), bg = "black", fg = "red").pack(pady = 15)
+        Label(root, text = "Syllabus Checker", font = ("Segoe UI", 18, "bold"), bg = "gray", fg = "black").pack(pady = 15)
 
         # File Selection
-        file_frame = Frame(root, bg = "black")
+        file_frame = Frame(root, bg = "gray")
         file_frame.pack(pady = 5)
 
-        Button(file_frame, text = "Select PDF",command=self.select_file,font = ("Segoe UI", 10),bg = "gray", fg = "white",relief = "flat", padx = 10, pady = 5).pack(side=LEFT, padx=5)
+        Button(file_frame, text = "Select PDF",command=self.select_file,font = ("Segoe UI", 10),bg = "white", fg = "black",relief = "flat", padx = 5, pady = 5).pack(side=LEFT, padx=2)
 
         self.file_label = Label(file_frame, text="No file selected",font=("Segoe UI", 9), bg="white", fg="black")
         self.file_label.pack(side = LEFT, padx = 5)
 
         # Input
         query_frame = Frame(root, bg = "black")
-        query_frame.pack(pady = 15)
+        query_frame.pack(pady = 2)
         self.query_entry = Entry(query_frame, width=45,font=("Segoe UI", 10),relief="solid", bd=1)
         self.query_entry.pack(side=LEFT, padx=5, ipady=3)
 
-        Button(query_frame, text="Analyze", command=self.run_file_check, font=("Segoe UI", 10), bg="blue", fg="white", relief="flat", padx=10, pady=5).pack(side=LEFT)
+        Button(query_frame, text="Analyze", command=self.run_file_check, font=("Segoe UI", 10), bg="gray", fg="black", relief="flat", padx=10, pady=5).pack(side=LEFT)
 
         # Results
         self.output = Text(root, wrap=WORD, font=("Consolas", 10),relief="solid", bd=1, bg="white", fg="black")
