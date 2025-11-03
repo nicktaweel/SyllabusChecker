@@ -1,20 +1,58 @@
+from pypdf import PdfReader
 from spellchecker import SpellChecker
+import re
 
-def spell_check_text(text):
+def extract_text_from_pdf(pdf_path):
+    reader = PdfReader(pdf_path)
+    text = ""
+    for page in reader.pages:
+        page_text = page.extract_text()
+        if page_text:
+            text += page_text + "\n"
+    return text
 
-    words = text.split()
-    misspelled = False
-    misspelled_word_cnt = 0
+
+def check_spelling(text):
     spell = SpellChecker()
-    misspelled_words = spell.unknown(words)
 
-    for word in misspelled_words:
-        print(f"{word} may have been spelled incorrectly, did you mean {spell.correction(word)}?")
-        misspelled_word_cnt += 1
+    words = re.findall(r"\b[a-zA-Z][a-zA-Z'-]*\b", text)
+    checked = set()
+    flagged = []
 
-    words_spelt_correctly = len(words) - misspelled_word_cnt
-    score = words_spelt_correctly / len(words)
-    return score
+    for word in words:
+        w = word.strip()
+
+        if w.lower() in checked:
+            continue
+        checked.add(w.lower())
+
+        # Filtering
+        if (
+            len(w) <= 2               # too short
+            or w.isupper()            # all caps
+            or w[0].isupper()         # proper noun
+            or re.search(r"\d", w)    # has numbers
+            or re.match(r"^(http|www|edu|com|org|net)", w.lower())  # URLs
+            or "-" in w               # compound words
+        ):
+            continue
+
+        # Spell Check
+        if w.lower() not in spell:
+            suggestions = spell.candidates(w)
+            flagged.append((w, suggestions))
+
+    # Display results
+    for word, suggestions in flagged:
+        print(f"Misspelled: {word} -> Suggestions: {', '.join(suggestions) if suggestions else 'None'}")
+
+    print(f"\nTotal possible misspelled words: {len(flagged)}")
+
+
+if __name__ == "__main__":
+    pdf_path = ""
+    text = extract_text_from_pdf(pdf_path)
+    check_spelling(text)
 
 
 
