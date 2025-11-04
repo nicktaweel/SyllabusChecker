@@ -6,6 +6,7 @@ import re
 import numpy as np
 import textstat
 
+
 def check_syllabus(file_path, query):
     outputs = []
 
@@ -55,21 +56,19 @@ def check_syllabus(file_path, query):
             # filters out less than 3 word sentences and single standing letters/numbers of 3 characters or less
         ]
 
-        # used as global variable
-        score = 0
-
         # ==============================================================================================================================#
+
         # function for rating readability
         # package used is textstat -- basically a package that performs statistics on text
         # source used: https://pypi.org/project/textstat/
         def rate_readability(sentences):
 
-            global score  # <---- KEY: MUTATE THE SHARED SCORE HERE
-
             # uses the pre-extracted "sentences" list from the syllabus to calculate various readability metrics and print a simple summary
-
             # combine all sentences back into one text block for scoring
-            text = " ".join(sentences)
+            text = " ".join(sentences).strip()
+
+            # use penalty (will be added to score, so negative penalty will decrease score)
+            penalty = 0
 
             # using the various functions availiable within the package for rating readability
             # --- Performing Flesch Reading Ease (FRE) --------
@@ -117,10 +116,10 @@ def check_syllabus(file_path, query):
                 outputs.append("Reading Ease: Standard (Appropriate College Level)")
             elif fre <= 40 and fre > 10:
                 outputs.append("Reading Ease: Difficult (College Graduate Level)")
-                score -= 5
+                penalty -= 5
             else:
                 outputs.append("Reading Ease: Extremely Difficult (Professional level)")
-                score -= 10
+                penalty -= 10
 
             # results from flesch-kincaid
             # source used for grading system: https://readable.com/readability/flesch-reading-ease-flesch-kincaid-grade-level/
@@ -132,18 +131,20 @@ def check_syllabus(file_path, query):
                 outputs.append("College level appropriate.")
             else:
                 outputs.append("Postgraduate/Professional level. Too complex")
-                score -= 10
+                penalty -= 10
 
             # results from gunning fog formula
             outputs.append("\n" + "=" * 50)
             outputs.append("Results from gunning fog formula:")
             if fog < 12:
                 outputs.append("Grade level is below appropriate level. No penalty issued.")
-            elif 12 <= fk <= 16:
+            elif 12 <= fog <= 16:
                 outputs.append("College level appropriate.")
             else:
                 outputs.append("Postgraduate/Professional level. Too complex")
-                score -= 10
+                penalty -= 10
+
+            return penalty #return the penalty score
 
         # ==============================================================================================================================#
         # Define required sections with their search queries
@@ -161,6 +162,12 @@ def check_syllabus(file_path, query):
             "counseling": "counseling services mental health student support",
             "equity": "equity diversity inclusion accessibility accommodations"
         }
+
+        # set score to 0
+        score = 0
+
+        # compue penalty readability score
+        penalty = rate_readability(sentences)
 
         # Define similarity threshold
         threshold = 0.05
@@ -213,7 +220,8 @@ def check_syllabus(file_path, query):
             for sec in found_ok:
                 outputs.append(f"\t ✓ {sec.title()}")
         else:
-            outputs.append(f"\nOverall Score: {score:.2f}: PASS")
+            total = score + penalty
+            outputs.append(f"\nOverall Score: {total:.2f}: PASS")
 
         # ======================================================================================================#
         # rate readability right after content analysis report
