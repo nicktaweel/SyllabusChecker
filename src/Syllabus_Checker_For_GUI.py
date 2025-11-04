@@ -166,7 +166,8 @@ def check_syllabus(file_path, query):
         # set score to 0
         score = 0
 
-        # compue penalty readability score
+        # compute penalty readability score
+        # ALSO CALLS THE FUNCTION TO PERFORM THE READABILITY REPORT
         penalty = rate_readability(sentences)
 
         # Define similarity threshold
@@ -224,8 +225,6 @@ def check_syllabus(file_path, query):
             outputs.append(f"\nOverall Score: {total:.2f}: PASS")
 
         # ======================================================================================================#
-        # rate readability right after content analysis report
-        rate_readability(sentences)
         # ======================================================================================================#
         # Show example matches for ALL sections (even ones that fail threshold)
         show_examples = input("\nShow example matches for all sections? (y/n): ").strip().lower()
