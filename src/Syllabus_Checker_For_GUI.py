@@ -74,35 +74,45 @@ def check_syllabus(file_path):
 
         # Interpret Flesch Reading Ease
         outputs.append("\n\nFlesch Reading Ease Analysis:")
-        if fre > 70:
+        if fre > 50:
             outputs.append("  ✓ Very Easy to Read (No penalty)")
-        elif 40 < fre <= 70:
+            outputs.append("  Suggestion: Sentences are short and word choice is simple. This is good for readability, but if this is an upper-level course you may want to incorporate more precise academic terminology where appropriate.")
+        elif 30 < fre <= 50:
             outputs.append("  ✓ Standard - Appropriate College Level (No penalty)")
-        elif 10 < fre <= 40:
+            outputs.append("  Suggestion: Sentence length and word complexity are appropriate for college students. No changes needed.")
+        elif 10 < fre <= 30:
             outputs.append("  ⚠ Difficult - College Graduate Level (Penalty: -5)")
+            outputs.append("  Suggestion: The score indicates long sentences or many multi-syllable words. Try shortening sentences or simplifying vocabulary so the text is easier to follow.")
             penalty -= 5
         else:
             outputs.append("  ✗ Extremely Difficult - Professional Level (Penalty: -10)")
+            outputs.append("  Suggestion: The text is very dense and uses complex vocabulary. Breaking up long sentences and reducing heavy jargon will improve accessibility.")
             penalty -= 10
 
         # Interpret Flesch-Kincaid Grade Level
         outputs.append("\n\nFlesch-Kincaid Grade Level Analysis:")
         if fk < 12:
             outputs.append("  ✓ Below college level (No penalty)")
-        elif 12 <= fk <= 16:
+            outputs.append("  Suggestion: The text uses shorter sentences and simpler words. This is clear and easy to follow, but if this is an advanced course you may want to use more discipline-specific language.")
+        elif 12 <= fk <= 18:
             outputs.append("  ✓ College level appropriate (No penalty)")
+            outputs.append("  Suggestion: Sentence length and word choice match typical college-level writing. No changes needed.")
         else:
             outputs.append("  ✗ Postgraduate/Professional level - Too complex (Penalty: -10)")
+            outputs.append("  Suggestion: The grade level suggests very long sentences or many multi-syllable words. Simplifying sentence structure or defining advanced terminology may help.")
             penalty -= 10
 
         # Interpret Gunning Fog Index
         outputs.append("\n\nGunning Fog Index Analysis:")
         if fog < 12:
             outputs.append("  ✓ Below college level (No penalty)")
-        elif 12 <= fog <= 16:
+            outputs.append("  Suggestion: This syllabus is very easy to read. You could consider adding some more advanced terminology where appropriate, but this is optional.")
+        elif 12 <= fog <= 17:
             outputs.append("  ✓ College level appropriate (No penalty)")
+            outputs.append("  Suggestion: Great job! The wording and complexity are appropriate for a college-level syllabus.")
         else:
             outputs.append("  ✗ Postgraduate/Professional level - Too complex (Penalty: -10)")
+            outputs.append("  Suggestion: The writing is highly complex. Consider shortening long sentences or simplifying vocabulary to make the material easier for students.")
             penalty -= 10
 
         return penalty
