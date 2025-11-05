@@ -8,70 +8,147 @@ class SyllabusApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Syllabus Analyzer")
-        self.root.geometry("700x600")
-        self.root.configure(bg = "gray")
+        self.root.geometry("800x700")
+        self.root.configure(bg="#2b2b2b")
 
         self.file_path = None
 
         # Title
-        Label(root, text = "Syllabus Checker", font = ("Segoe UI", 18, "bold"), bg = "gray", fg = "black").pack(pady = 15)
+        title_label = Label(
+            root,
+            text="📄 Syllabus Checker",
+            font=("Segoe UI", 20, "bold"),
+            bg="#2b2b2b",
+            fg="#ffffff"
+        )
+        title_label.pack(pady=20)
 
-        # File Selection
-        file_frame = Frame(root, bg = "gray")
-        file_frame.pack(pady = 5)
+        # File Selection Frame
+        file_frame = Frame(root, bg="#2b2b2b")
+        file_frame.pack(pady=10)
 
-        Button(file_frame, text = "Select PDF",command=self.select_file,font = ("Segoe UI", 10),bg = "white", fg = "black",relief = "flat", padx = 5, pady = 5).pack(side=LEFT, padx=2)
+        select_btn = Button(
+            file_frame,
+            text="Select PDF",
+            command=self.select_file,
+            font=("Segoe UI", 11),
+            bg="#4a9eff",
+            fg="white",
+            relief="flat",
+            padx=15,
+            pady=8,
+            cursor="hand2"
+        )
+        select_btn.pack(side=LEFT, padx=5)
 
-        self.file_label = Label(file_frame, text="No file selected",font=("Segoe UI", 9), bg="white", fg="black")
-        self.file_label.pack(side = LEFT, padx = 5)
+        self.file_label = Label(
+            file_frame,
+            text="No file selected",
+            font=("Segoe UI", 10),
+            bg="#3a3a3a",
+            fg="#cccccc",
+            padx=10,
+            pady=8
+        )
+        self.file_label.pack(side=LEFT, padx=5)
 
-        # Input
-        query_frame = Frame(root, bg = "black")
-        query_frame.pack(pady = 2)
-        self.query_entry = Entry(query_frame, width=45,font=("Segoe UI", 10),relief="solid", bd=1)
-        self.query_entry.pack(side=LEFT, padx=5, ipady=3)
+        # Analyze Button
+        analyze_btn = Button(
+            root,
+            text="▶ Analyze Syllabus",
+            command=self.run_file_check,
+            font=("Segoe UI", 12, "bold"),
+            bg="#4CAF50",
+            fg="white",
+            relief="flat",
+            padx=20,
+            pady=10,
+            cursor="hand2"
+        )
+        analyze_btn.pack(pady=10)
 
-        Button(query_frame, text="Analyze", command=self.run_file_check, font=("Segoe UI", 10), bg="gray", fg="black", relief="flat", padx=10, pady=5).pack(side=LEFT)
+        # Output Text Area
+        output_frame = Frame(root, bg="#2b2b2b")
+        output_frame.pack(fill=BOTH, expand=True, padx=20, pady=10)
 
-        # Results
-        self.output = Text(root, wrap=WORD, font=("Consolas", 10),relief="solid", bd=1, bg="white", fg="black")
-        self.output.pack(fill=BOTH, expand=True, padx=20, pady=10)
+        # Scrollbar
+        scrollbar = Scrollbar(output_frame)
+        scrollbar.pack(side=RIGHT, fill=Y)
 
-        # Syllabus Status
-        self.status = Label(root, text="Ready", bg="black",fg="white", font=("Segoe UI", 9, "italic"))
-        self.status.pack(side=BOTTOM, pady=5)
+        self.output = Text(
+            output_frame,
+            wrap=WORD,
+            font=("Consolas", 9),
+            relief="solid",
+            bd=1,
+            bg="#1e1e1e",
+            fg="#d4d4d4",
+            yscrollcommand=scrollbar.set
+        )
+        self.output.pack(fill=BOTH, expand=True)
+        scrollbar.config(command=self.output.yview)
 
-    # for the actual file selection
+        # Status Bar
+        self.status = Label(
+            root,
+            text="Ready to analyze",
+            bg="#1e1e1e",
+            fg="#4a9eff",
+            font=("Segoe UI", 9),
+            anchor=W,
+            padx=10,
+            pady=5
+        )
+        self.status.pack(side=BOTTOM, fill=X)
+
     def select_file(self):
-        path = filedialog.askopenfilename(filetypes=[("PDF files", "*.pdf")])
+        # open dialogue to insert new file
+        path = filedialog.askopenfilename(
+            title="Select a Syllabus PDF",
+            filetypes=[("PDF files", "*.pdf"), ("All files", "*.*")]
+        )
         if path:
             self.file_path = path
-            self.file_label.config(text=path.split("/")[-1], fg="white")
-            self.log(f"Selected file: {path}")
+            filename = path.split("/")[-1]
+            self.file_label.config(text=filename, fg="#4CAF50")
+            self.log(f"✓ File selected: {filename}\n")
+            self.set_status(f"Ready to analyze: {filename}", "#4CAF50")
 
     def run_file_check(self):
+        # validate input and then begin analysis in background. we do this so that the gui can remain functional while it is analyzing
         if not self.file_path:
-            messagebox.showwarning("Missing File", "Please select a PDF file first.")
+            messagebox.showwarning("No File Selected", "Please select a PDF file first.")
             return
-        query = self.query_entry.get().strip()
-        threading.Thread(target=self.perform_check, args=(query,), daemon=True).start()
 
-    def perform_check(self, query):
-        self.set_status("Reading Syllabus.", "blue")
+        # Start analysis in background thread to keep GUI responsive
+        threading.Thread(target=self.perform_check, daemon=True).start()
+
+    def perform_check(self):
+        # pergform analysis and display results
+        self.set_status("Analyzing syllabus...", "#ffa500")
         self.output.delete(1.0, END)
+
         try:
-            report = check_syllabus(self.file_path, query)
+            # Run the analysis
+            report = check_syllabus(self.file_path)
+
+            # Display results
             self.log(report)
-            self.set_status("Done", "blue")
+            self.set_status("✓ Analysis complete", "#4CAF50")
+
         except Exception as e:
-            self.log(f"Error: {e}")
-            self.set_status("Error", "red")
+            error_msg = f"✗ Error during analysis:\n{str(e)}"
+            self.log(error_msg)
+            self.set_status("✗ Analysis failed", "#ff4444")
+            messagebox.showerror("Analysis Error", f"An error occurred:\n\n{str(e)}")
 
     def log(self, msg):
+        # append all output together for one big print
         self.output.insert(END, msg + "\n")
         self.output.see(END)
 
-    def set_status(self, msg, color="blue"):
+    def set_status(self, msg, color="#4a9eff"):
+        # make shit loook pretty
         self.status.config(text=msg, fg=color)
         self.root.update_idletasks()
 

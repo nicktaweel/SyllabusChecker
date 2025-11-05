@@ -1,267 +1,220 @@
 from pypdf import PdfReader
 import os
-from rapidfuzz import fuzz
 from sentence_transformers import CrossEncoder
 import re
 import numpy as np
 import textstat
 
 
-def check_syllabus(file_path, query):
+def check_syllabus(file_path):
+
     outputs = []
 
+    # Validate file
     if not os.path.isfile(file_path):
-        outputs.append("Error: The file does not exist.")
+        return "Error: The file does not exist."
     elif not file_path.lower().endswith(".pdf"):
-        outputs.append("Error: Only PDF files are accepted.")
+        return "Error: Only PDF files are accepted."
+
+    # Parse filename
+    file_name = os.path.basename(file_path).replace(".pdf", "")
+    parts = file_name.split("_")
+
+    if len(parts) >= 4 and parts[1][0].isdigit():
+        course = f"{parts[0]}.{parts[1]}"
+        instructor = parts[2]
+        semester = parts[3]
+    elif len(parts) >= 3:
+        course = parts[0]
+        instructor = parts[1]
+        semester = parts[2]
     else:
-        file_name = os.path.basename(file_path).replace(".pdf", "")
-        parts = file_name.split("_")
+        outputs.append("Warning: Unexpected filename format.")
+        course = instructor = semester = "Unknown"
 
-        # dumbass course correction code if too many too little underscores i know OCD bullshit
-        if len(parts) >= 4 and parts[1][0].isdigit():
-            course = f"{parts[0]}.{parts[1]}"
-            instructor = parts[2]
-            semester = parts[3]
-        elif len(parts) >= 3:
-            course = parts[0]
-            instructor = parts[1]
-            semester = parts[2]
+    outputs.append(f"COURSE: {course}, INSTRUCTOR: {instructor}, SEMESTER: {semester}")
+
+    # Extract text from PDF
+    reader = PdfReader(file_path)
+    all_text = ""
+    for i, page in enumerate(reader.pages, start=1):
+        text = page.extract_text()
+        if text:
+            all_text += text + "\n"
         else:
-            outputs.append("Warning: Unexpected filename format.")
-            course = instructor = semester = None
+            all_text += f"\n--- Page {i} ---\n[No Text Found]\n"
 
-        # save into variables for now cause i wanna use the instructor variable to find and fully print instructor name, so we get first name
-        # by using the last name we save here, to solve the Janghoon Yang / Yi Yang problem
-        outputs.append(f"COURSE: {course}, INSTRUCTOR: {instructor}, SEMESTER: {semester}")
+    # Load model
+    outputs.append("\nLoading sentence transformer model...")
+    model = CrossEncoder("cross-encoder/ms-marco-MiniLM-L6-v2")
 
-        reader = PdfReader(file_path)
-        all_text = ""
-        for i, page in enumerate(reader.pages, start=1):
-            text = page.extract_text()
-            if text:
-                all_text += text + "\n"
-            else:
-                all_text += f"\n--- Page {i} ---\n[No Text Found]\n"
+    # Split into sentences
+    sentences = [
+        s.strip()
+        for s in re.split(r'(?<=[.!?])\s+|\n+', all_text)
+        if (len(s.split()) > 3 and re.search(r"[A-Za-z]{3,}", s))
+    ]
 
-        # Load cross-encoder model
-        outputs.append("\nLoading sentence transformer model...")
-        model = CrossEncoder("cross-encoder/ms-marco-MiniLM-L6-v2")
+    # Readability Analysis
+    def rate_readability(sentences):
+        # calculates readability and then deducts points form score. we can change later just how i decided to implement for now.
+        text = " ".join(sentences).strip()
+        penalty = 0
 
-        # Split text into sentences
-        sentences = [
-            s.strip()
-            for s in re.split(r'(?<=[.!?])\s+|\n+', all_text)  # adjusted to split on new lines
-            if (len(s.split()) > 3 and re.search(r"[A-Za-z]{3,}", s))
-            # filters out less than 3 word sentences and single standing letters/numbers of 3 characters or less
-        ]
+        # Calculate metrics
+        fre = textstat.flesch_reading_ease(text)
+        fk = textstat.flesch_kincaid_grade(text)
+        fog = textstat.gunning_fog(text)
 
-        # ==============================================================================================================================#
+        # Display readability report
+        outputs.append("\n\nREADABILITY REPORT")
+        outputs.append(f"Flesch Reading Ease (FRE): {fre:.2f}")
+        outputs.append(f"Flesch-Kincaid Grade (FK): {fk:.2f}")
+        outputs.append(f"Gunning Fog Index (FOG): {fog:.2f}")
 
-        # function for rating readability
-        # package used is textstat -- basically a package that performs statistics on text
-        # source used: https://pypi.org/project/textstat/
-        def rate_readability(sentences):
+        # Interpret Flesch Reading Ease
+        outputs.append("\n\nFlesch Reading Ease Analysis:")
+        if fre > 70:
+            outputs.append("  ✓ Very Easy to Read (No penalty)")
+        elif 40 < fre <= 70:
+            outputs.append("  ✓ Standard - Appropriate College Level (No penalty)")
+        elif 10 < fre <= 40:
+            outputs.append("  ⚠ Difficult - College Graduate Level (Penalty: -5)")
+            penalty -= 5
+        else:
+            outputs.append("  ✗ Extremely Difficult - Professional Level (Penalty: -10)")
+            penalty -= 10
 
-            # uses the pre-extracted "sentences" list from the syllabus to calculate various readability metrics and print a simple summary
-            # combine all sentences back into one text block for scoring
-            text = " ".join(sentences).strip()
+        # Interpret Flesch-Kincaid Grade Level
+        outputs.append("\n\nFlesch-Kincaid Grade Level Analysis:")
+        if fk < 12:
+            outputs.append("  ✓ Below college level (No penalty)")
+        elif 12 <= fk <= 16:
+            outputs.append("  ✓ College level appropriate (No penalty)")
+        else:
+            outputs.append("  ✗ Postgraduate/Professional level - Too complex (Penalty: -10)")
+            penalty -= 10
 
-            # use penalty (will be added to score, so negative penalty will decrease score)
-            penalty = 0
+        # Interpret Gunning Fog Index
+        outputs.append("\n\nGunning Fog Index Analysis:")
+        if fog < 12:
+            outputs.append("  ✓ Below college level (No penalty)")
+        elif 12 <= fog <= 16:
+            outputs.append("  ✓ College level appropriate (No penalty)")
+        else:
+            outputs.append("  ✗ Postgraduate/Professional level - Too complex (Penalty: -10)")
+            penalty -= 10
 
-            # using the various functions availiable within the package for rating readability
-            # --- Performing Flesch Reading Ease (FRE) --------
-            # this measures how easy the syllabus is to read. higher score = easier.
-            # measures the sentence and word length of the text. basically tells us how approachable a language is.\
-            # this is done using a formula that is briefly covered in the wikipedia article
-            # the source tells us that 50-70 is suitable for a college level -- not too easy, but not too difficult
-            # we should flag anything from 30-10, lose points, and tell user that it is at a "College Graduate Level" (the source tells us this)
-            # anything under 10 should be flagged and lose double points because it is "Professional Level" (again, the source tells us this)
-            # please find the source i used for further research here: https://en.wikipedia.org/wiki/Flesch%E2%80%93Kincaid_readability_tests#Flesch_reading_ease
-            fre = textstat.flesch_reading_ease(text)
+        return penalty
 
-            # --- Performing Flesch-Kincaid Grade level (FK) ----
-            # this presents a score as a U.S. grade level
-            # this also uses the same components of FRE (sentence length, syllabes/word) but mapped to a grade scale
-            # this is done also using a formula that is briefly covered in the wikipedia article
-            # for example: 11.5 means an 11th grader would be able to read the document
-            # lets aim for 10 - 13 and review what documents for scores over 14 look like.
-            # source for further research: https://en.wikipedia.org/wiki/Flesch%E2%80%93Kincaid_readability_tests#Flesch%E2%80%93Kincaid_grade_level
-            fk = textstat.flesch_kincaid_grade(text)
+    # Content Analysis
+    required_sections = {
+        "Contact Information": "email address contact information @psu.edu",
+        "Course Materials": "required textbooks course materials readings references",
+        "Course Content and Expectations": "course outcomes objective goal expectations",
+        "Location and Meeting Times": "location meeting times class schedule room building",
+        "Course Goals and Objectives": "course objectives learning objectives goals",
+        "Grade Breakdown": "grading policy grade distribution grading scale",
+        "Examination Policy": "exams tests quizzes assessment",
+        "Academic Integrity Statement": "academic integrity academic honesty plagiarism cheating",
+        "Counseling Services": "counseling services mental health student support wellness",
+        "Disability Resources": "disability resources impairment adjustment accommodation ADA",
+        "Educational Equity Statement": "equity diversity inclusion accessibility accommodations non-discrimination",
+        "Campus Closure Policy": "campus closed closure weather emergency snow cancellation"
+    }
 
-            # --- Performing the Gunning Fog Formula -----
-            # the algorithm works by determining the average sentence length (divides the number of words by the number of sentences)
-            # it counts "complex" words consisting of three or more syllables (does not include proper nouns, familiar jargon, or compound words (like -es, -ed, -ing) etc.)
-            # it then adds the average sentence length and the percentage of complex words and multiplies the result by 0.4
-            # according to the source, we should aim for all sources between 12 (high school senior) and 16 (college senior).
-            # scores below 12 should not be flagged and scores over 16 should be flagged
-            # additional source used: https://en.wikipedia.org/wiki/Gunning_fog_index
-            fog = textstat.gunning_fog(text)
+    # Recommendations for missing sections
+    section_recommendations = {
+        "Contact Information": "Contact information for all course instructors (including undergraduate or graduate assistants), such as email or phone numbers.",
+        "Course Materials": "List all required textbooks, readings, and course materials.",
+        "Course Content and Expectations": "A minimum of 80% of the core content and learning objectives approved by Faculty Senate must be included in the most current course proposal.",
+        "Location and Meeting Times": "Include the classroom location, building name/number, and meeting days/times for the course.",
+        "Course Goals and Objectives": "Course Goals describe the broad knowledge domains and expectations for the course. Course Objectives align with course goals, but are more explicit and represent behaviors,skills, or attitudes that students will learn and demonstrate in the course; objectives are assessed through class activities, assignments, examinations, and/or projects.",
+        "Grade Breakdown": "Provide a clear breakdown of how final grades are calculated, and pertain to what letter grade.",
+        "Examination Policy": "The course exam policy should include the dates, times and locations of all exams. The syllabus should also note if exams will be administered outside of class time.",
+        "Academic Integrity Statement": "Include Penn State's academic integrity policy and consequences for violations like plagiarism.",
+        "Counseling Services": "Provide information about campus counseling and psychological services (CAPS) for student mental health support.",
+        "Disability Resources": "Information on procedures related to academic adjustments identified by Student Disability Resources.",
+        "Educational Equity Statement": "Provide information related to reporting educational bias through the report bias site.",
+        "Campus Closure Policy": "Explain procedures for class cancellations due to weather, emergencies, or other campus closures."
+    }
 
-            # now printing readability report
-            outputs.append("\n------------------Readability Report-------------------")
-            outputs.append(f"Flesch Reading Ease (FRE): {fre:.2f}")
-            outputs.append(f"Flesch-Kincaid Grade (FK): {fk:.2f}")
-            outputs.append(f"Gunning Fog Index (FOG): {fog:.2f}")
+    # Calculate readability penalty
+    penalty = rate_readability(sentences)
 
-            # interpret and explain the scores
+    # Initialize score
+    score = 0
+    threshold = 0.05
 
-            # results from flesch reading ease
-            outputs.append("\n" + "=" * 50)
-            outputs.append("Results from flesch-reading-ease:")
-            if fre > 70:
-                outputs.append("Reading Ease: Very Easy to Read")
-            elif fre <= 70 and fre > 40:
-                outputs.append("Reading Ease: Standard (Appropriate College Level)")
-            elif fre <= 40 and fre > 10:
-                outputs.append("Reading Ease: Difficult (College Graduate Level)")
-                penalty -= 5
-            else:
-                outputs.append("Reading Ease: Extremely Difficult (Professional level)")
-                penalty -= 10
+    # Analyze required sections
+    outputs.append("\n\nCONTENT ANALYSIS REPORT")
+    results = {}
 
-            # results from flesch-kincaid
-            # source used for grading system: https://readable.com/readability/flesch-reading-ease-flesch-kincaid-grade-level/
-            outputs.append("\n" + "=" * 50)
-            outputs.append("Results from flesch-kincaid:")
-            if fk < 12:
-                outputs.append("Grade level is below appropriate level. No penalty issued.")
-            elif 12 <= fk <= 16:
-                outputs.append("College level appropriate.")
-            else:
-                outputs.append("Postgraduate/Professional level. Too complex")
-                penalty -= 10
+    for section, query in required_sections.items():
+        # Compare query to all sentences
+        scores = model.predict(
+            [(query.lower(), s.lower()) for s in sentences],
+            show_progress_bar=False
+        )
 
-            # results from gunning fog formula
-            outputs.append("\n" + "=" * 50)
-            outputs.append("Results from gunning fog formula:")
-            if fog < 12:
-                outputs.append("Grade level is below appropriate level. No penalty issued.")
-            elif 12 <= fog <= 16:
-                outputs.append("College level appropriate.")
-            else:
-                outputs.append("Postgraduate/Professional level. Too complex")
-                penalty -= 10
+        # Convert to probabilities
+        probs = 1 / (1 + np.exp(-scores))
 
-            return penalty #return the penalty score
+        # Get top result
+        query_results = list(zip(sentences, probs))
+        query_results.sort(key=lambda x: x[1], reverse=True)
 
-        # ==============================================================================================================================#
-        # Define required sections with their search queries
-        # created a dictionary so this works better, also found that sentence transformers can accept a fuck ton of words and
-        # use all of them to develop their search. So we can add to the values in the dictionaries over time to better shape search
-        required_sections = {
-            "email": "email address contact information @psu.edu office hours",
-            "materials": "required textbooks course materials readings references",
-            "outcome": "course outcomes objective goal",
-            "office hours": "office hours instructor availability meeting times",
-            "objective": "course objectives learning objectives goals",
-            "grading": "grading policy grade distribution grading scale",
-            "exams": "exams tests quizzes",
-            "academic integrity": "academic integrity academic honesty plagiarism cheating",
-            "counseling": "counseling services mental health student support",
-            "equity": "equity diversity inclusion accessibility accommodations"
+        best_sentence, best_score = query_results[0]
+        found = best_score >= threshold
+
+        results[section] = {
+            "found": found,
+            "score": best_score,
+            "sentence": best_sentence
         }
 
-        # set score to 0
-        score = 0
+        status = "✓ Found" if found else "✗ Missing"
+        outputs.append(f"{section:<35} {status:<12} (confidence: {best_score:.2f})")
 
-        # compute penalty readability score
-        # ALSO CALLS THE FUNCTION TO PERFORM THE READABILITY REPORT
-        penalty = rate_readability(sentences)
+        if found:
+            score += 10
 
-        # Define similarity threshold
-        threshold = 0.05
+    # Summary
+    missing = [sec for sec, r in results.items() if not r["found"]]
+    found_ok = [sec for sec, r in results.items() if r["found"]]
+    total_score = score + penalty
 
-        # Analyze each section
-        outputs.append("\n--- Content Analysis Report ---")
-        results = {}
+    outputs.append("\n\nFINAL SUMMARY")
+    outputs.append(f"Content Score: {score} points ({len(found_ok)}/{len(required_sections)} sections found)")
+    outputs.append(f"Readability Penalty: {penalty} points")
+    outputs.append(f"Total Score: {total_score} points")
+    outputs.append("")
 
-        for section, query in required_sections.items():
-            # Compare query to all sentences
-            scores = model.predict(
-                [(query.lower(), s.lower()) for s in sentences],
-                show_progress_bar=False
-            )
+    if missing:
+        outputs.append("Status: ⚠ INCOMPLETE")
+        outputs.append("\nMissing Sections:")
+        for sec in missing:
+            outputs.append(f"  ✗ {sec}")
+        outputs.append("\nFound Sections:")
+        for sec in found_ok:
+            outputs.append(f"  ✓ {sec}")
 
-            # Convert to probabilities
-            probs = 1 / (1 + np.exp(-scores))
-
-            # Get top results
-            query_results = list(zip(sentences, probs))
-            query_results.sort(key=lambda x: x[1], reverse=True)
-
-            best_sentence, best_score = query_results[0]
-            found = best_score >= threshold
-
-            # Check if found
-            results[section] = {
-                "found": found,
-                "score": best_score,
-                "sentence": best_sentence
-            }
-
-            status = "Found" if found else "Missing"
-            outputs.append(f"{section.title()}: {status} (score = {best_score:.2f})")
-
-            if found:
-                score += 10
-
-        # NEW SUMMARY BEHAVIOR
-        missing = [sec for sec, r in results.items() if not r["found"]]
-        found_ok = [sec for sec, r in results.items() if r["found"]]
-
-        if missing:
-            outputs.append("\nResult: FAIL")
-            outputs.append("Required sections (missing first): ")
-            # missing first labeled with "X"
-            for sec in missing:
-                outputs.append(f"\t X {sec.title()}")
-            # then found with a checkmark
-            for sec in found_ok:
-                outputs.append(f"\t ✓ {sec.title()}")
-        else:
-            total = score + penalty
-            outputs.append(f"\nOverall Score: {total:.2f}: PASS")
-
-        # ======================================================================================================#
-        # ======================================================================================================#
-        # Show example matches for ALL sections (even ones that fail threshold)
-        show_examples = input("\nShow example matches for all sections? (y/n): ").strip().lower()
-        if show_examples == 'y':
-            print("\n--- Example Matches ---")
-            for section, result in results.items():
-                print(f"\n{section.title()} (score = {result['score']:.2f}):")
-                print(f"  {result['sentence']}")
-
-        # Custom query search (idk we can cut)
-        print("\n" + "=" * 50)
-        answer = input("\nWould you like to search for a phrase? (y/n): ").strip().lower()
-        if answer == 'y':
-            query = input("\nEnter a phrase to search for in the syllabus (e.g., 'attendance policy'): ").strip()
-
-            if query:
-                # Compare query to all sentences
-                scores = model.predict(
-                    [(query.lower(), s.lower()) for s in sentences],
-                    show_progress_bar=False
-                )
-
-                # Convert to probabilities
-                probs = 1 / (1 + np.exp(-scores))
-
-                # Get top results
-                query_results = list(zip(sentences, probs))
-                query_results.sort(key=lambda x: x[1], reverse=True)
-
-                best_sentence, best_score = query_results[0]
-                found = best_score >= threshold
-
-                print("\n--- Custom Query Report ---")
-                print(f"Query: {query}")
-                print(f"Result: {'Found!' if found else 'Missing!'} (score = {best_score:.2f})")
-
-                if found:
-                    print(f"Example match:\n  {best_sentence.strip()}")
+        # Add recommendations for missing sections
+        outputs.append("\n\nRECOMMENDATIONS FOR MISSING SECTIONS")
+        for sec in missing:
+            outputs.append(f"\n• {sec}:")
+            outputs.append(f"  → {section_recommendations[sec]}")
+    else:
+        outputs.append("Status: ✓ COMPLETE - All required sections found!")
 
     return "\n".join(outputs)
+
+
+def get_example_matches(file_path):
+    """
+    Returns example sentence matches for all required sections.
+    This is a separate function so the GUI can call it optionally.
+    """
+    # [This would contain similar logic to extract and show examples]
+    # Keeping it separate for cleaner code organization
+    pass
