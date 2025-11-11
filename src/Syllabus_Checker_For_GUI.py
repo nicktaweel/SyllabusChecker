@@ -183,8 +183,8 @@ def check_syllabus(file_path):
             "sentence": best_sentence
         }
 
-        status = "✓ Found" if found else "✗ Missing"
-        outputs.append(f"{section:<35} {status:<12} (confidence: {best_score:.2f})")
+        status = "✓ Found" if found else "✗ Not Found"
+        outputs.append(f"{section:<35} {status:<12}")
 
         if found:
             score += 10
@@ -202,20 +202,22 @@ def check_syllabus(file_path):
 
     if missing:
         outputs.append("Status: ⚠ INCOMPLETE")
-        outputs.append("\nMissing Sections:")
+        outputs.append("\nSections Not Found:")
         for sec in missing:
             outputs.append(f"  ✗ {sec}")
-        outputs.append("\nFound Sections:")
+        outputs.append("\nSections Found:")
         for sec in found_ok:
             outputs.append(f"  ✓ {sec}")
 
         # Add recommendations for missing sections
-        outputs.append("\n\nRECOMMENDATIONS FOR MISSING SECTIONS")
+        outputs.append("\n\nRECOMMENDATIONS FOR SECTIONS NOT FOUND")
         for sec in missing:
             outputs.append(f"\n• {sec}:")
             outputs.append(f"  → {section_recommendations[sec]}")
     else:
         outputs.append("Status: ✓ COMPLETE - All required sections found!")
+
+    outputs.append("\nMore information about syllabus requirements can be found at: https://senate.psu.edu/faculty/syllabus-requirements/")
 
     return "\n".join(outputs)
 
