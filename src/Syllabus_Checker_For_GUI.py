@@ -7,7 +7,6 @@ import textstat
 
 
 def check_syllabus(file_path):
-
     outputs = []
 
     # Validate file
@@ -76,43 +75,53 @@ def check_syllabus(file_path):
         outputs.append("\n\nFlesch Reading Ease Analysis:")
         if fre > 50:
             outputs.append("  ✓ Very Easy to Read (No penalty)")
-            outputs.append("  Suggestion: Sentences are short and word choice is simple. This is good for readability, but if this is an upper-level course you may want to incorporate more precise academic terminology where appropriate.")
+            outputs.append(
+                "  Suggestion: Sentences are short and word choice is simple. This is good for readability, but if this is an upper-level course you may want to incorporate more precise academic terminology where appropriate.")
         elif 30 < fre <= 50:
             outputs.append("  ✓ Standard - Appropriate College Level (No penalty)")
-            outputs.append("  Suggestion: Sentence length and word complexity are appropriate for college students. No changes needed.")
+            outputs.append(
+                "  Suggestion: Sentence length and word complexity are appropriate for college students. No changes needed.")
         elif 10 < fre <= 30:
             outputs.append("  ⚠ Difficult - College Graduate Level (Penalty: -5)")
-            outputs.append("  Suggestion: The score indicates long sentences or many multi-syllable words. Try shortening sentences or simplifying vocabulary so the text is easier to follow.")
+            outputs.append(
+                "  Suggestion: The score indicates long sentences or many multi-syllable words. Try shortening sentences or simplifying vocabulary so the text is easier to follow.")
             penalty -= 5
         else:
             outputs.append("  ✗ Extremely Difficult - Professional Level (Penalty: -10)")
-            outputs.append("  Suggestion: The text is very dense and uses complex vocabulary. Breaking up long sentences and reducing heavy jargon will improve accessibility.")
+            outputs.append(
+                "  Suggestion: The text is very dense and uses complex vocabulary. Breaking up long sentences and reducing heavy jargon will improve accessibility.")
             penalty -= 10
 
         # Interpret Flesch-Kincaid Grade Level
         outputs.append("\n\nFlesch-Kincaid Grade Level Analysis:")
         if fk < 12:
             outputs.append("  ✓ Below college level (No penalty)")
-            outputs.append("  Suggestion: The text uses shorter sentences and simpler words. This is clear and easy to follow, but if this is an advanced course you may want to use more discipline-specific language.")
+            outputs.append(
+                "  Suggestion: The text uses shorter sentences and simpler words. This is clear and easy to follow, but if this is an advanced course you may want to use more discipline-specific language.")
         elif 12 <= fk <= 18:
             outputs.append("  ✓ College level appropriate (No penalty)")
-            outputs.append("  Suggestion: Sentence length and word choice match typical college-level writing. No changes needed.")
+            outputs.append(
+                "  Suggestion: Sentence length and word choice match typical college-level writing. No changes needed.")
         else:
             outputs.append("  ✗ Postgraduate/Professional level - Too complex (Penalty: -10)")
-            outputs.append("  Suggestion: The grade level suggests very long sentences or many multi-syllable words. Simplifying sentence structure or defining advanced terminology may help.")
+            outputs.append(
+                "  Suggestion: The grade level suggests very long sentences or many multi-syllable words. Simplifying sentence structure or defining advanced terminology may help.")
             penalty -= 10
 
         # Interpret Gunning Fog Index
         outputs.append("\n\nGunning Fog Index Analysis:")
         if fog < 12:
             outputs.append("  ✓ Below college level (No penalty)")
-            outputs.append("  Suggestion: This syllabus is very easy to read. You could consider adding some more advanced terminology where appropriate, but this is optional.")
+            outputs.append(
+                "  Suggestion: This syllabus is very easy to read. You could consider adding some more advanced terminology where appropriate, but this is optional.")
         elif 12 <= fog <= 17:
             outputs.append("  ✓ College level appropriate (No penalty)")
-            outputs.append("  Suggestion: Great job! The wording and complexity are appropriate for a college-level syllabus.")
+            outputs.append(
+                "  Suggestion: Great job! The wording and complexity are appropriate for a college-level syllabus.")
         else:
             outputs.append("  ✗ Postgraduate/Professional level - Too complex (Penalty: -10)")
-            outputs.append("  Suggestion: The writing is highly complex. Consider shortening long sentences or simplifying vocabulary to make the material easier for students.")
+            outputs.append(
+                "  Suggestion: The writing is highly complex. Consider shortening long sentences or simplifying vocabulary to make the material easier for students.")
             penalty -= 10
 
         return penalty
@@ -126,6 +135,7 @@ def check_syllabus(file_path):
         "Course Goals and Objectives": "course objectives learning objectives goals",
         "Grade Breakdown": "grading policy grade distribution grading scale",
         "Examination Policy": "exams tests quizzes assessment",
+        "Attendance Policy": "attendance policy absences late arriving class participation presence",
         "Academic Integrity Statement": "academic integrity academic honesty plagiarism cheating",
         "Counseling Services": "counseling services mental health student support wellness",
         "Disability Resources": "disability resources impairment adjustment accommodation ADA",
@@ -137,16 +147,34 @@ def check_syllabus(file_path):
     section_recommendations = {
         "Contact Information": "Contact information for all course instructors (including undergraduate or graduate assistants), such as email or phone numbers.",
         "Course Materials": "List all required textbooks, readings, and course materials.",
-        "Course Content and Expectations": "A minimum of 80% of the core content and learning objectives approved by Faculty Senate must be included in the most current course proposal.",
+        "Course Content and Expectations": "The content of this course, and the expectations of what a student should know / be able to do at its conclusion should be featured in detail.",
         "Location and Meeting Times": "Include the classroom location, building name/number, and meeting days/times for the course.",
         "Course Goals and Objectives": "Course Goals describe the broad knowledge domains and expectations for the course. Course Objectives align with course goals, but are more explicit and represent behaviors,skills, or attitudes that students will learn and demonstrate in the course; objectives are assessed through class activities, assignments, examinations, and/or projects.",
         "Grade Breakdown": "Provide a clear breakdown of how final grades are calculated, and pertain to what letter grade.",
         "Examination Policy": "The course exam policy should include the dates, times and locations of all exams. The syllabus should also note if exams will be administered outside of class time.",
+        "Attendance Policy": "Clearly state your attendance expectations, including how absences affect grades, whether excused absences are allowed, and the procedure for notifying you of absences.",
         "Academic Integrity Statement": "Include Penn State's academic integrity policy and consequences for violations like plagiarism.",
         "Counseling Services": "Provide information about campus counseling and psychological services (CAPS) for student mental health support.",
         "Disability Resources": "Information on procedures related to academic adjustments identified by Student Disability Resources.",
         "Educational Equity Statement": "Provide information related to reporting educational bias through the report bias site.",
         "Campus Closure Policy": "Explain procedures for class cancellations due to weather, emergencies, or other campus closures."
+    }
+
+    # Kudos messages for found sections
+    section_kudos = {
+        "Contact Information": "Great! Students will be able to easily reach you with questions or concerns.",
+        "Course Materials": "Excellent! Students know exactly what materials they need to purchase or access.",
+        "Course Content and Expectations": "Well done! Students have a clear understanding of what the course covers and what's expected of them.",
+        "Location and Meeting Times": "Perfect! Students know where and when to show up for class.",
+        "Course Goals and Objectives": "Fantastic! Clear learning objectives help students understand what they'll achieve in this course.",
+        "Grade Breakdown": "Excellent! Students can see exactly how their performance will be evaluated.",
+        "Examination Policy": "Great job! Students know what to expect regarding exams and assessments.",
+        "Attendance Policy": "Well done! Students understand your expectations regarding attendance and absences.",
+        "Academic Integrity Statement": "Excellent! This sets clear expectations about academic honesty and ethical behavior.",
+        "Counseling Services": "Thank you for including this! Students now know where to find mental health support.",
+        "Disability Resources": "Great! Students with disabilities know how to request accommodations.",
+        "Educational Equity Statement": "Wonderful! This promotes an inclusive and welcoming learning environment.",
+        "Campus Closure Policy": "Good thinking! Students know what to do if campus closes unexpectedly."
     }
 
     # Calculate readability penalty
@@ -194,14 +222,29 @@ def check_syllabus(file_path):
     found_ok = [sec for sec, r in results.items() if r["found"]]
     total_score = score + penalty
 
+    # Determine grade based on total score with some colored text
+    if total_score >= 120:
+        grade = "EXCELLENT"
+        grade_color = "#00A86B"  # Jade
+    elif total_score >= 100:
+        grade = "GREAT"
+        grade_color = "#00FF00"  # Green
+    elif total_score >= 80:
+        grade = "GOOD"
+        grade_color = "#FFFF00"  # Yellow
+    elif total_score >= 60:
+        grade = "ADEQUATE"
+        grade_color = "#FFA500"  # Orange
+    else:
+        grade = "INCOMPLETE"
+        grade_color = "#FF0000"  # Red
+
     outputs.append("\n\nFINAL SUMMARY")
-    outputs.append(f"Content Score: {score} points ({len(found_ok)}/{len(required_sections)} sections found)")
-    outputs.append(f"Readability Penalty: {penalty} points")
-    outputs.append(f"Total Score: {total_score} points")
+    outputs.append(f"GRADE: <color={grade_color}>{grade}</color>")
     outputs.append("")
 
     if missing:
-        outputs.append("Status: ⚠ INCOMPLETE")
+        outputs.append("\nSections Not Found:")
         outputs.append("\nSections Not Found:")
         for sec in missing:
             outputs.append(f"  ✗ {sec}")
@@ -214,19 +257,21 @@ def check_syllabus(file_path):
         for sec in missing:
             outputs.append(f"\n• {sec}:")
             outputs.append(f"  → {section_recommendations[sec]}")
-    else:
-        outputs.append("Status: ✓ COMPLETE - All required sections found!")
 
-    outputs.append("\nMore information about syllabus requirements can be found at: https://senate.psu.edu/faculty/syllabus-requirements/")
+        # Add kudos for found sections
+        if found_ok:
+            outputs.append("\n\nKUDOS FOR SECTIONS FOUND")
+            for sec in found_ok:
+                outputs.append(f"\n• {sec}:")
+                outputs.append(f"  ✓ {section_kudos[sec]}")
+    else:
+        # Add kudos for all sections when complete
+        outputs.append("\nKUDOS - ALL SECTIONS FOUND!")
+        for sec in found_ok:
+            outputs.append(f"\n• {sec}:")
+            outputs.append(f"  ✓ {section_kudos[sec]}")
+
+    outputs.append(
+        "\nMore information about syllabus requirements can be found at: https://senate.psu.edu/faculty/syllabus-requirements/")
 
     return "\n".join(outputs)
-
-
-def get_example_matches(file_path):
-    """
-    Returns example sentence matches for all required sections.
-    This is a separate function so the GUI can call it optionally.
-    """
-    # [This would contain similar logic to extract and show examples]
-    # Keeping it separate for cleaner code organization
-    pass

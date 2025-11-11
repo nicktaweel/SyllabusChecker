@@ -78,7 +78,7 @@ class SyllabusApp:
         self.output = Text(
             output_frame,
             wrap=WORD,
-            font=("Consolas", 14),
+            font=("Consolas", 9),
             relief="solid",
             bd=1,
             bg="#1e1e1e",
@@ -102,7 +102,7 @@ class SyllabusApp:
         self.status.pack(side=BOTTOM, fill=X)
 
     def select_file(self):
-        # open dialogue to insert new file
+        # open file explorer
         path = filedialog.askopenfilename(
             title="Select a Syllabus PDF",
             filetypes=[("PDF files", "*.pdf"), ("All files", "*.*")]
@@ -115,7 +115,7 @@ class SyllabusApp:
             self.set_status(f"Ready to analyze: {filename}", "#4CAF50")
 
     def run_file_check(self):
-        # validate input and then begin analysis in background. we do this so that the gui can remain functional while it is analyzing
+        # validate input and start analyzing in background to keep GUI running
         if not self.file_path:
             messagebox.showwarning("No File Selected", "Please select a PDF file first.")
             return
@@ -124,7 +124,7 @@ class SyllabusApp:
         threading.Thread(target=self.perform_check, daemon=True).start()
 
     def perform_check(self):
-        # pergform analysis and display results
+       # perform check and generate results
         self.set_status("Analyzing syllabus...", "#ffa500")
         self.output.delete(1.0, END)
 
@@ -143,12 +143,29 @@ class SyllabusApp:
             messagebox.showerror("Analysis Error", f"An error occurred:\n\n{str(e)}")
 
     def log(self, msg):
-        # append all output together for one big print
-        self.output.insert(END, msg + "\n")
+      # appemd messages to output but with some new colors
+        import re
+        color_pattern = r'<color=(#[0-9A-Fa-f]{6})>(.*?)</color>'
+
+        parts = re.split(color_pattern, msg)
+
+        for i, part in enumerate(parts):
+            if i % 3 == 0:  # Regular text
+                if part:
+                    self.output.insert(END, part)
+            elif i % 3 == 1:  # Color code
+                color = part
+            elif i % 3 == 2:  # Colored text
+                tag_name = f"color_{color}"
+                if tag_name not in self.output.tag_names():
+                    self.output.tag_config(tag_name, foreground=color)
+                self.output.insert(END, part, tag_name)
+
+        self.output.insert(END, "\n")
         self.output.see(END)
 
+# add color witj status anmd color
     def set_status(self, msg, color="#4a9eff"):
-        # make shit loook pretty
         self.status.config(text=msg, fg=color)
         self.root.update_idletasks()
 
