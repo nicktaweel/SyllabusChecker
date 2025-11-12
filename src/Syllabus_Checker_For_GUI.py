@@ -53,9 +53,38 @@ def check_syllabus(file_path):
         for s in re.split(r'(?<=[.!?])\s+|\n+', all_text)
         if (len(s.split()) > 3 and re.search(r"[A-Za-z]{3,}", s))
     ]
+    # ==== derive course_level from the existing parse ====
+    # two cases: course and course number separated by a period or underscore
+    # Case A: format like CMPSC_303_*  -> we already verified parts[1][0].isdigit()
+    # four or more chunks lets us know we have course_courseNum_instructor_sem
+    if len(parts) >= 4 and parts[1] and parts[1][0].isdigit():
+        course_num_token = parts[1]  # e.g., "303" or "201E"
+        level_char = course_num_token[0]  # '3' or '2'
+    # Case B: format like "ENG.202_*" (number sits inside `course`, e.g., "ENG.202")
+    elif course != "Unknown":
+        m = re.search(r'^[A-Za-z]{2,}\.(\d)', course)  # read the first digit immediately after the dot
+        if not m:
+            raise ValueError(
+                f"Filename pattern present but level missing in course token '{course}'. "
+                "Expected like 'ENG.202' or 'CMPSC.303'."
+            )
+        level_char = m.group(1)
+    # we hard-fail if we can’t read the level
+    else:
+        raise ValueError(
+            f"Unexpected filename format for '{file_name}'. Cannot determine course level."
+        )
+
+    # convert to an integer, and if its not part of our level dict, throw error
+    course_level = int(level_char)
+    if course_level not in (0, 1, 2, 3, 4):
+        raise ValueError(
+            f"Unsupported course level '{course_level}' in '{file_name}'. "
+            "Expected 1–4 (e.g., ENG.101, CMPSC_203, ENGL.302, CMPSC_463)."
+        )
 
     # Readability Analysis
-    def rate_readability(sentences):
+    def rate_readability(sentences, level):
         # calculates readability and then deducts points form score. we can change later just how i decided to implement for now.
         text = " ".join(sentences).strip()
         penalty = 0
@@ -65,63 +94,130 @@ def check_syllabus(file_path):
         fk = textstat.flesch_kincaid_grade(text)
         fog = textstat.gunning_fog(text)
 
-        # Display readability report
-        outputs.append("\n\nREADABILITY REPORT")
-        outputs.append(f"Flesch Reading Ease (FRE): {fre:.2f}")
-        outputs.append(f"Flesch-Kincaid Grade (FK): {fk:.2f}")
-        outputs.append(f"Gunning Fog Index (FOG): {fog:.2f}")
+        # dictionary to hold the different range values for readability based on course level
+        LEVEL = {
+            # fre uses tuple, first value is the value we set as the "easy" threshold
+            # second is our perfect spot
+            # anything lower than third is issued a penalty
+            # FK_MIN is our threshold for easy flesch kincaid
+            # FK_MAX is our limit for flesch kincaid
+            # FOG_MIN is our threshold for easy gunning fog
+            # FOG_MAX is our limit for gunning fog
+            0: {"FRE": (60, 30, 25), "FK": (12, 16), "FOG": (10, 16)},
+            1: {"FRE": (60, 30, 25), "FK": (12, 16), "FOG": (10,16)}, # for like eng 101
+            2: {"FRE": (60, 30, 20), "FK": (12, 18), "FOG": (12,18)},
+            3: {"FRE": (50, 30, 10), "FK": (12, 20), "FOG": (12,20)},
+            4: {"FRE": (40, 10, 0), "FK": (12, 25), "FOG": (12, 25)}
+        }
 
-        # Interpret Flesch Reading Ease
-        outputs.append("\n\nFlesch Reading Ease Analysis:")
-        if fre > 50:
-            outputs.append("  ✓ Very Easy to Read (No penalty)")
-            outputs.append(
-                "  Suggestion: Sentences are short and word choice is simple. This is good for readability, but if this is an upper-level course you may want to incorporate more precise academic terminology where appropriate.")
-        elif 30 < fre <= 50:
-            outputs.append("  ✓ Standard - Appropriate College Level (No penalty)")
-            outputs.append(
-                "  Suggestion: Sentence length and word complexity are appropriate for college students. No changes needed.")
-        elif 10 < fre <= 30:
-            outputs.append("  ⚠ Difficult - College Graduate Level (Penalty: -5)")
-            outputs.append(
-                "  Suggestion: The score indicates long sentences or many multi-syllable words. Try shortening sentences or simplifying vocabulary so the text is easier to follow.")
+        fre_easy, fre_pref, fre_warn = LEVEL[level]["FRE"]
+        fk_min, fk_max = LEVEL[level]["FK"]
+        fog_min, fog_max = LEVEL[level]["FOG"]
+
+        # Interpret Flesch Reading Ease (FRE)
+        outputs.append("\n\nFlesch Reading Ease (FRE):")
+        outputs.append("  → This test measures how easy your syllabus is to read. "
+                       "Higher scores mean simpler, more approachable language.")
+
+        if fre >= fre_easy:
+            outputs.append("  ✓ Very easy to read (No penalty)")
+            outputs.append("  What you did well:")
+            outputs.append("    - Sentences are concise and easy to follow.")
+            outputs.append("    - The writing tone feels friendly and direct without unnecessary jargon.")
+            outputs.append("    - Sections are likely short and well-spaced, making the syllabus comfortable to skim.")
+            outputs.append("  What you could improve on:")
+            outputs.append("    - For upper-level courses, consider incorporating more discipline-specific vocabulary where appropriate.")
+            outputs.append("    - Keep the structure clear but add slightly more technical depth if the content allows.")
+        elif fre_pref <= fre < fre_easy:
+            outputs.append("  ✓ Comfortable for college readers (No penalty)")
+            outputs.append("  What you did well:")
+            outputs.append("    - The tone and structure are balanced for most college students.")
+            outputs.append("    - Important information like grading or due dates is likely placed in accessible sections.")
+            outputs.append("    - The syllabus reads naturally, without being too casual or too formal.")
+            outputs.append("  What you could improve on:")
+            outputs.append("    - Keep paragraphs short and focused on one idea at a time.")
+            outputs.append("    - Use consistent headers and bullets to help students locate policies or deadlines faster.")
+        elif fre_warn < fre < fre_pref:
+            outputs.append("  ⚠ Slightly challenging (Penalty: -5)")
+            outputs.append("  What you did well:")
+            outputs.append("    - The writing maintains an academic tone suited for the subject matter.")
+            outputs.append("    - Most sentences appear complete and grammatically correct.")
+            outputs.append("  What you could improve on:")
+            outputs.append("    - Shorten long sentences or divide them into two for clarity.")
+            outputs.append("    - Replace complex or abstract phrasing with direct, action-oriented language.")
+            outputs.append("    - Add bullet lists or subheadings for key sections like assignments or grading.")
             penalty -= 5
-        else:
-            outputs.append("  ✗ Extremely Difficult - Professional Level (Penalty: -10)")
-            outputs.append(
-                "  Suggestion: The text is very dense and uses complex vocabulary. Breaking up long sentences and reducing heavy jargon will improve accessibility.")
+        else:  # fre <= fre_warn
+            outputs.append("  ✗ Hard to read (Penalty: -10)")
+            outputs.append("  What you did well:")
+            outputs.append("    - The syllabus likely conveys all required information thoroughly.")
+            outputs.append("  What you could improve on:")
+            outputs.append("    - Simplify the sentence structure and remove filler words.")
+            outputs.append("    - Break long paragraphs into shorter ones with clear headings.")
+            outputs.append("    - Avoid heavy academic wording that could confuse students.")
+            outputs.append("    - Use bullets or numbered lists to improve readability and organization.")
             penalty -= 10
 
-        # Interpret Flesch-Kincaid Grade Level
-        outputs.append("\n\nFlesch-Kincaid Grade Level Analysis:")
-        if fk < 12:
-            outputs.append("  ✓ Below college level (No penalty)")
-            outputs.append(
-                "  Suggestion: The text uses shorter sentences and simpler words. This is clear and easy to follow, but if this is an advanced course you may want to use more discipline-specific language.")
-        elif 12 <= fk <= 18:
-            outputs.append("  ✓ College level appropriate (No penalty)")
-            outputs.append(
-                "  Suggestion: Sentence length and word choice match typical college-level writing. No changes needed.")
-        else:
-            outputs.append("  ✗ Postgraduate/Professional level - Too complex (Penalty: -10)")
-            outputs.append(
-                "  Suggestion: The grade level suggests very long sentences or many multi-syllable words. Simplifying sentence structure or defining advanced terminology may help.")
+        # Interpret Flesch-Kincaid Grade Level (FK)
+        outputs.append("\n\nFlesch–Kincaid Grade Level (FK):")
+        outputs.append("  → This test converts your text’s difficulty into a U.S. school grade level. "
+                       "A higher number means a more advanced reading level.")
+
+        if fk < fk_min:
+            outputs.append("  ✓ Easy to follow (No penalty)")
+            outputs.append("  What you did well:")
+            outputs.append("    - The syllabus is written in plain, accessible language suitable for a wide range of students.")
+            outputs.append("    - Instructions and expectations are straightforward and easy to understand.")
+            outputs.append("  What you could improve on:")
+            outputs.append("    - For higher-level courses, include brief explanations of key terminology or standards to add depth.")
+            outputs.append("    - Use course-specific examples or references to connect the content to real-world applications.")
+        elif fk_min <= fk <= fk_max:
+            outputs.append("  ✓ Matches course expectations (No penalty)")
+            outputs.append("  What you did well:")
+            outputs.append("    - The tone balances professionalism with accessibility.")
+            outputs.append("    - Sentences likely contain enough detail to clarify expectations without overcomplicating them.")
+            outputs.append("  What you could improve on:")
+            outputs.append("    - Keep directions action-oriented (e.g., “Submit by Friday” instead of “Submissions should be made by Friday”).")
+            outputs.append("    - Limit multi-clause sentences and maintain consistent tense throughout.")
+        else:  # fk > fk_max
+            outputs.append("  ✗ Too advanced for most students (Penalty: -10)")
+            outputs.append("  What you did well:")
+            outputs.append("    - The writing demonstrates a strong academic tone and attention to detail.")
+            outputs.append("  What you could improve on:")
+            outputs.append("    - Simplify clause-heavy sentences and use direct verbs instead of nominalized phrases (e.g., “evaluation of” → “evaluate”).")
+            outputs.append("    - Reduce technical jargon or define it briefly where necessary.")
+            outputs.append("    - Reorder long sentences so the action appears near the beginning.")
             penalty -= 10
 
-        # Interpret Gunning Fog Index
-        outputs.append("\n\nGunning Fog Index Analysis:")
-        if fog < 12:
-            outputs.append("  ✓ Below college level (No penalty)")
-            outputs.append(
-                "  Suggestion: This syllabus is very easy to read. You could consider adding some more advanced terminology where appropriate, but this is optional.")
-        elif 12 <= fog <= 17:
-            outputs.append("  ✓ College level appropriate (No penalty)")
-            outputs.append(
-                "  Suggestion: Great job! The wording and complexity are appropriate for a college-level syllabus.")
-        else:
-            outputs.append("  ✗ Postgraduate/Professional level - Too complex (Penalty: -10)")
-            outputs.append(
-                "  Suggestion: The writing is highly complex. Consider shortening long sentences or simplifying vocabulary to make the material easier for students.")
+        # Interpret Gunning Fog Index (FOG)
+        outputs.append("\n\nGunning Fog Index (FOG):")
+        outputs.append("  → This test estimates how many years of education a reader needs to understand the text. "
+                       "Higher scores mean denser or more complex language.")
+
+        if fog < fog_min:
+            outputs.append("  ✓ Very easy to understand (No penalty)")
+            outputs.append("  What you did well:")
+            outputs.append("    - The syllabus is straightforward and free of unnecessary complexity.")
+            outputs.append("    - Students can likely locate and understand essential information with minimal effort.")
+            outputs.append("  What you could improve on:")
+            outputs.append("    - If this is an upper-level course, introduce concise technical terms to align with subject expectations.")
+            outputs.append("    - Ensure any added detail still maintains clarity and directness.")
+        elif fog_min <= fog <= fog_max:
+            outputs.append("  ✓ On target for your course (No penalty)")
+            outputs.append("  What you did well:")
+            outputs.append("    - The syllabus is appropriately detailed without being overly wordy.")
+            outputs.append("    - Complex information is likely presented in clear, digestible segments.")
+            outputs.append("  What you could improve on:")
+            outputs.append("    - Continue balancing academic vocabulary with plain explanations.")
+            outputs.append("    - Use bullet lists, tables, or spacing to visually separate dense information.")
+        else:  # fog > fog_max
+            outputs.append("  ✗ Too complex or dense (Penalty: -10)")
+            outputs.append("  What you did well:")
+            outputs.append("    - The writing conveys expertise and comprehensive coverage of the course.")
+            outputs.append("  What you could improve on:")
+            outputs.append("    - Shorten long sentences and avoid excessive multi-syllabic words.")
+            outputs.append("    - Simplify nested clauses and use punctuation strategically to improve pacing.")
+            outputs.append("    - Rework dense paragraphs into shorter, clearly labeled sections so students can skim key information.")
             penalty -= 10
 
         return penalty
@@ -178,7 +274,7 @@ def check_syllabus(file_path):
     }
 
     # Calculate readability penalty
-    penalty = rate_readability(sentences)
+    penalty = rate_readability(sentences, course_level)
 
     # Initialize score
     score = 0
