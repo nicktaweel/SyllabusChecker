@@ -1,0 +1,373 @@
+from pypdf import PdfReader
+import os
+from sentence_transformers import CrossEncoder
+import re
+import numpy as np
+import textstat
+
+
+def check_syllabus(file_path):
+    outputs = []
+
+    # Validate file
+    if not os.path.isfile(file_path):
+        return "Error: The file does not exist."
+    elif not file_path.lower().endswith(".pdf"):
+        return "Error: Only PDF files are accepted."
+
+    # Parse filename
+    file_name = os.path.basename(file_path).replace(".pdf", "")
+    parts = file_name.split("_")
+
+    if len(parts) >= 4 and parts[1][0].isdigit():
+        course = f"{parts[0]}.{parts[1]}"
+        instructor = parts[2]
+        semester = parts[3]
+    elif len(parts) >= 3:
+        course = parts[0]
+        instructor = parts[1]
+        semester = parts[2]
+    else:
+        outputs.append("Warning: Unexpected filename format.")
+        course = instructor = semester = "Unknown"
+
+    outputs.append(f"COURSE: {course}, INSTRUCTOR: {instructor}, SEMESTER: {semester}")
+
+    # Extract text from PDF
+    reader = PdfReader(file_path)
+    all_text = ""
+    for i, page in enumerate(reader.pages, start=1):
+        text = page.extract_text()
+        if text:
+            all_text += text + "\n"
+        else:
+            all_text += f"\n--- Page {i} ---\n[No Text Found]\n"
+
+    # Load model
+    outputs.append("\nLoading sentence transformer model...")
+    model = CrossEncoder("cross-encoder/ms-marco-MiniLM-L6-v2")
+
+    # Split into sentences
+    sentences = [
+        s.strip()
+        for s in re.split(r'(?<=[.!?])\s+|\n+', all_text)
+        if (len(s.split()) > 3 and re.search(r"[A-Za-z]{3,}", s))
+    ]
+    # ==== derive course_level from the existing parse ====
+    # two cases: course and course number separated by a period or underscore
+    # Case A: format like CMPSC_303_*  -> we already verified parts[1][0].isdigit()
+    # four or more chunks lets us know we have course_courseNum_instructor_sem
+    if len(parts) >= 4 and parts[1] and parts[1][0].isdigit():
+        course_num_token = parts[1]  # e.g., "303" or "201E"
+        level_char = course_num_token[0]  # '3' or '2'
+    # Case B: format like "ENG.202_*" (number sits inside `course`, e.g., "ENG.202")
+    elif course != "Unknown":
+        m = re.search(r'^[A-Za-z]{2,}\.(\d)', course)  # read the first digit immediately after the dot
+        if not m:
+            raise ValueError(
+                f"Filename pattern present but level missing in course token '{course}'. "
+                "Expected like 'ENG.202' or 'CMPSC.303'."
+            )
+        level_char = m.group(1)
+    # we hard-fail if we can’t read the level
+    else:
+        raise ValueError(
+            f"Unexpected filename format for '{file_name}'. Cannot determine course level."
+        )
+
+    # convert to an integer, and if its not part of our level dict, throw error
+    course_level = int(level_char)
+    if course_level not in (0, 1, 2, 3, 4):
+        raise ValueError(
+            f"Unsupported course level '{course_level}' in '{file_name}'. "
+            "Expected 1–4 (e.g., ENG.101, CMPSC_203, ENGL.302, CMPSC_463)."
+        )
+
+    # Readability Analysis
+    def rate_readability(sentences, level):
+        # calculates readability and then deducts points form score. we can change later just how i decided to implement for now.
+        text = " ".join(sentences).strip()
+        penalty = 0
+
+        # Calculate metrics
+        fre = textstat.flesch_reading_ease(text)
+        fk = textstat.flesch_kincaid_grade(text)
+        fog = textstat.gunning_fog(text)
+
+        # dictionary to hold the different range values for readability based on course level
+        LEVEL = {
+            # fre uses tuple, first value is the value we set as the "easy" threshold
+            # second is our perfect spot
+            # anything lower than third is issued a penalty
+            # FK_MIN is our threshold for easy flesch kincaid
+            # FK_MAX is our limit for flesch kincaid
+            # FOG_MIN is our threshold for easy gunning fog
+            # FOG_MAX is our limit for gunning fog
+            0: {"FRE": (60, 30, 25), "FK": (12, 16), "FOG": (10, 16)},
+            1: {"FRE": (60, 30, 25), "FK": (12, 16), "FOG": (10,16)}, # for like eng 101
+            2: {"FRE": (60, 30, 20), "FK": (12, 18), "FOG": (12,18)},
+            3: {"FRE": (50, 30, 10), "FK": (12, 20), "FOG": (12,20)},
+            4: {"FRE": (40, 10, 0), "FK": (12, 25), "FOG": (12, 25)}
+        }
+
+        fre_easy, fre_pref, fre_warn = LEVEL[level]["FRE"]
+        fk_min, fk_max = LEVEL[level]["FK"]
+        fog_min, fog_max = LEVEL[level]["FOG"]
+
+        # Interpret Flesch Reading Ease (FRE)
+        outputs.append("\n\nFlesch Reading Ease (FRE):")
+        outputs.append("  → This test measures how easy your syllabus is to read. "
+                       "Higher scores mean simpler, more approachable language.")
+
+        if fre >= fre_easy:
+            outputs.append("  ✓ Very easy to read (No penalty)")
+            outputs.append("  What you did well:")
+            outputs.append("    - Sentences are concise and easy to follow.")
+            outputs.append("    - The writing tone feels friendly and direct without unnecessary jargon.")
+            outputs.append("    - Sections are likely short and well-spaced, making the syllabus comfortable to skim.")
+            outputs.append("  What you could improve on:")
+            outputs.append("    - For upper-level courses, consider incorporating more discipline-specific vocabulary where appropriate.")
+            outputs.append("    - Keep the structure clear but add slightly more technical depth if the content allows.")
+        elif fre_pref <= fre < fre_easy:
+            outputs.append("  ✓ Comfortable for college readers (No penalty)")
+            outputs.append("  What you did well:")
+            outputs.append("    - The tone and structure are balanced for most college students.")
+            outputs.append("    - Important information like grading or due dates is likely placed in accessible sections.")
+            outputs.append("    - The syllabus reads naturally, without being too casual or too formal.")
+            outputs.append("  What you could improve on:")
+            outputs.append("    - Keep paragraphs short and focused on one idea at a time.")
+            outputs.append("    - Use consistent headers and bullets to help students locate policies or deadlines faster.")
+        elif fre_warn < fre < fre_pref:
+            outputs.append("  ⚠ Slightly challenging (Penalty: -5)")
+            outputs.append("  What you did well:")
+            outputs.append("    - The writing maintains an academic tone suited for the subject matter.")
+            outputs.append("    - Most sentences appear complete and grammatically correct.")
+            outputs.append("  What you could improve on:")
+            outputs.append("    - Shorten long sentences or divide them into two for clarity.")
+            outputs.append("    - Replace complex or abstract phrasing with direct, action-oriented language.")
+            outputs.append("    - Add bullet lists or subheadings for key sections like assignments or grading.")
+            penalty -= 5
+        else:  # fre <= fre_warn
+            outputs.append("  ✗ Hard to read (Penalty: -10)")
+            outputs.append("  What you did well:")
+            outputs.append("    - The syllabus likely conveys all required information thoroughly.")
+            outputs.append("  What you could improve on:")
+            outputs.append("    - Simplify the sentence structure and remove filler words.")
+            outputs.append("    - Break long paragraphs into shorter ones with clear headings.")
+            outputs.append("    - Avoid heavy academic wording that could confuse students.")
+            outputs.append("    - Use bullets or numbered lists to improve readability and organization.")
+            penalty -= 10
+
+        # Interpret Flesch-Kincaid Grade Level (FK)
+        outputs.append("\n\nFlesch–Kincaid Grade Level (FK):")
+        outputs.append("  → This test converts your text’s difficulty into a U.S. school grade level. "
+                       "A higher number means a more advanced reading level.")
+
+        if fk < fk_min:
+            outputs.append("  ✓ Easy to follow (No penalty)")
+            outputs.append("  What you did well:")
+            outputs.append("    - The syllabus is written in plain, accessible language suitable for a wide range of students.")
+            outputs.append("    - Instructions and expectations are straightforward and easy to understand.")
+            outputs.append("  What you could improve on:")
+            outputs.append("    - For higher-level courses, include brief explanations of key terminology or standards to add depth.")
+            outputs.append("    - Use course-specific examples or references to connect the content to real-world applications.")
+        elif fk_min <= fk <= fk_max:
+            outputs.append("  ✓ Matches course expectations (No penalty)")
+            outputs.append("  What you did well:")
+            outputs.append("    - The tone balances professionalism with accessibility.")
+            outputs.append("    - Sentences likely contain enough detail to clarify expectations without overcomplicating them.")
+            outputs.append("  What you could improve on:")
+            outputs.append("    - Keep directions action-oriented (e.g., “Submit by Friday” instead of “Submissions should be made by Friday”).")
+            outputs.append("    - Limit multi-clause sentences and maintain consistent tense throughout.")
+        else:  # fk > fk_max
+            outputs.append("  ✗ Too advanced for most students (Penalty: -10)")
+            outputs.append("  What you did well:")
+            outputs.append("    - The writing demonstrates a strong academic tone and attention to detail.")
+            outputs.append("  What you could improve on:")
+            outputs.append("    - Simplify clause-heavy sentences and use direct verbs instead of nominalized phrases (e.g., “evaluation of” → “evaluate”).")
+            outputs.append("    - Reduce technical jargon or define it briefly where necessary.")
+            outputs.append("    - Reorder long sentences so the action appears near the beginning.")
+            penalty -= 10
+
+        # Interpret Gunning Fog Index (FOG)
+        outputs.append("\n\nGunning Fog Index (FOG):")
+        outputs.append("  → This test estimates how many years of education a reader needs to understand the text. "
+                       "Higher scores mean denser or more complex language.")
+
+        if fog < fog_min:
+            outputs.append("  ✓ Very easy to understand (No penalty)")
+            outputs.append("  What you did well:")
+            outputs.append("    - The syllabus is straightforward and free of unnecessary complexity.")
+            outputs.append("    - Students can likely locate and understand essential information with minimal effort.")
+            outputs.append("  What you could improve on:")
+            outputs.append("    - If this is an upper-level course, introduce concise technical terms to align with subject expectations.")
+            outputs.append("    - Ensure any added detail still maintains clarity and directness.")
+        elif fog_min <= fog <= fog_max:
+            outputs.append("  ✓ On target for your course (No penalty)")
+            outputs.append("  What you did well:")
+            outputs.append("    - The syllabus is appropriately detailed without being overly wordy.")
+            outputs.append("    - Complex information is likely presented in clear, digestible segments.")
+            outputs.append("  What you could improve on:")
+            outputs.append("    - Continue balancing academic vocabulary with plain explanations.")
+            outputs.append("    - Use bullet lists, tables, or spacing to visually separate dense information.")
+        else:  # fog > fog_max
+            outputs.append("  ✗ Too complex or dense (Penalty: -10)")
+            outputs.append("  What you did well:")
+            outputs.append("    - The writing conveys expertise and comprehensive coverage of the course.")
+            outputs.append("  What you could improve on:")
+            outputs.append("    - Shorten long sentences and avoid excessive multi-syllabic words.")
+            outputs.append("    - Simplify nested clauses and use punctuation strategically to improve pacing.")
+            outputs.append("    - Rework dense paragraphs into shorter, clearly labeled sections so students can skim key information.")
+            penalty -= 10
+
+        return penalty
+
+    # Content Analysis
+    required_sections = {
+        "Contact Information": "email address contact information @psu.edu",
+        "Course Materials": "required textbooks course materials readings references",
+        "Course Content and Expectations": "course outcomes objective goal expectations",
+        "Location and Meeting Times": "location meeting times class schedule room building",
+        "Course Goals and Objectives": "course objectives learning objectives goals",
+        "Grade Breakdown": "grading policy grade distribution grading scale",
+        "Examination Policy": "exams tests quizzes assessment",
+        "Attendance Policy": "attendance policy absences late arriving class participation presence",
+        "Academic Integrity Statement": "academic integrity academic honesty plagiarism cheating",
+        "Counseling Services": "counseling services mental health student support wellness",
+        "Disability Resources": "disability resources impairment adjustment accommodation ADA",
+        "Educational Equity Statement": "equity diversity inclusion accessibility accommodations non-discrimination",
+        "Campus Closure Policy": "campus closed closure weather emergency snow cancellation"
+    }
+
+    # Recommendations for missing sections
+    section_recommendations = {
+        "Contact Information": "Contact information for all course instructors (including undergraduate or graduate assistants), such as email or phone numbers.",
+        "Course Materials": "List all required textbooks, readings, and course materials.",
+        "Course Content and Expectations": "The content of this course, and the expectations of what a student should know / be able to do at its conclusion should be featured in detail.",
+        "Location and Meeting Times": "Include the classroom location, building name/number, and meeting days/times for the course.",
+        "Course Goals and Objectives": "Course Goals describe the broad knowledge domains and expectations for the course. Course Objectives align with course goals, but are more explicit and represent behaviors,skills, or attitudes that students will learn and demonstrate in the course; objectives are assessed through class activities, assignments, examinations, and/or projects.",
+        "Grade Breakdown": "Provide a clear breakdown of how final grades are calculated, and pertain to what letter grade.",
+        "Examination Policy": "The course exam policy should include the dates, times and locations of all exams. The syllabus should also note if exams will be administered outside of class time.",
+        "Attendance Policy": "Clearly state your attendance expectations, including how absences affect grades, whether excused absences are allowed, and the procedure for notifying you of absences.",
+        "Academic Integrity Statement": "Include Penn State's academic integrity policy and consequences for violations like plagiarism.",
+        "Counseling Services": "Provide information about campus counseling and psychological services (CAPS) for student mental health support.",
+        "Disability Resources": "Information on procedures related to academic adjustments identified by Student Disability Resources.",
+        "Educational Equity Statement": "Provide information related to reporting educational bias through the report bias site.",
+        "Campus Closure Policy": "Explain procedures for class cancellations due to weather, emergencies, or other campus closures."
+    }
+
+    # Kudos messages for found sections
+    section_kudos = {
+        "Contact Information": "Great! Students will be able to easily reach you with questions or concerns.",
+        "Course Materials": "Excellent! Students know exactly what materials they need to purchase or access.",
+        "Course Content and Expectations": "Well done! Students have a clear understanding of what the course covers and what's expected of them.",
+        "Location and Meeting Times": "Perfect! Students know where and when to show up for class.",
+        "Course Goals and Objectives": "Fantastic! Clear learning objectives help students understand what they'll achieve in this course.",
+        "Grade Breakdown": "Excellent! Students can see exactly how their performance will be evaluated.",
+        "Examination Policy": "Great job! Students know what to expect regarding exams and assessments.",
+        "Attendance Policy": "Well done! Students understand your expectations regarding attendance and absences.",
+        "Academic Integrity Statement": "Excellent! This sets clear expectations about academic honesty and ethical behavior.",
+        "Counseling Services": "Thank you for including this! Students now know where to find mental health support.",
+        "Disability Resources": "Great! Students with disabilities know how to request accommodations.",
+        "Educational Equity Statement": "Wonderful! This promotes an inclusive and welcoming learning environment.",
+        "Campus Closure Policy": "Good thinking! Students know what to do if campus closes unexpectedly."
+    }
+
+    # Calculate readability penalty
+    penalty = rate_readability(sentences, course_level)
+
+    # Initialize score
+    score = 0
+    threshold = 0.05
+
+    # Analyze required sections
+    outputs.append("\n\nCONTENT ANALYSIS REPORT")
+    results = {}
+
+    for section, query in required_sections.items():
+        # Compare query to all sentences
+        scores = model.predict(
+            [(query.lower(), s.lower()) for s in sentences],
+            show_progress_bar=False
+        )
+
+        # Convert to probabilities
+        probs = 1 / (1 + np.exp(-scores))
+
+        # Get top result
+        query_results = list(zip(sentences, probs))
+        query_results.sort(key=lambda x: x[1], reverse=True)
+
+        best_sentence, best_score = query_results[0]
+        found = best_score >= threshold
+
+        results[section] = {
+            "found": found,
+            "score": best_score,
+            "sentence": best_sentence
+        }
+
+        status = "✓ Found" if found else "✗ Not Found"
+        outputs.append(f"{section:<35} {status:<12}")
+
+        if found:
+            score += 10
+
+    # Summary
+    missing = [sec for sec, r in results.items() if not r["found"]]
+    found_ok = [sec for sec, r in results.items() if r["found"]]
+    total_score = score + penalty
+
+    # Determine grade based on total score with some colored text
+    if total_score >= 120:
+        grade = "EXCELLENT"
+        grade_color = "#00A86B"  # Jade
+    elif total_score >= 100:
+        grade = "GREAT"
+        grade_color = "#00FF00"  # Green
+    elif total_score >= 80:
+        grade = "GOOD"
+        grade_color = "#FFFF00"  # Yellow
+    elif total_score >= 60:
+        grade = "ADEQUATE"
+        grade_color = "#FFA500"  # Orange
+    else:
+        grade = "INCOMPLETE"
+        grade_color = "#FF0000"  # Red
+
+    outputs.append("\n\nFINAL SUMMARY")
+    outputs.append(f"GRADE: <color={grade_color}>{grade}</color>")
+    outputs.append("")
+
+    if missing:
+        outputs.append("\nSections Not Found:")
+        outputs.append("\nSections Not Found:")
+        for sec in missing:
+            outputs.append(f"  ✗ {sec}")
+        outputs.append("\nSections Found:")
+        for sec in found_ok:
+            outputs.append(f"  ✓ {sec}")
+
+        # Add recommendations for missing sections
+        outputs.append("\n\nRECOMMENDATIONS FOR SECTIONS NOT FOUND")
+        for sec in missing:
+            outputs.append(f"\n• {sec}:")
+            outputs.append(f"  → {section_recommendations[sec]}")
+
+        # Add kudos for found sections
+        if found_ok:
+            outputs.append("\n\nKUDOS FOR SECTIONS FOUND")
+            for sec in found_ok:
+                outputs.append(f"\n• {sec}:")
+                outputs.append(f"  ✓ {section_kudos[sec]}")
+    else:
+        # Add kudos for all sections when complete
+        outputs.append("\nKUDOS - ALL SECTIONS FOUND!")
+        for sec in found_ok:
+            outputs.append(f"\n• {sec}:")
+            outputs.append(f"  ✓ {section_kudos[sec]}")
+
+    outputs.append(
+        "\nMore information about syllabus requirements can be found at: https://senate.psu.edu/faculty/syllabus-requirements/")
+
+    return "\n".join(outputs)
