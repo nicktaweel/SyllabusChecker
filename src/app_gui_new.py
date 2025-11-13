@@ -78,7 +78,7 @@ class SyllabusApp:
         self.output = Text(
             output_frame,
             wrap=WORD,
-            font=("Consolas", 9),
+            font=("Consolas", 14),
             relief="solid",
             bd=1,
             bg="#1e1e1e",
