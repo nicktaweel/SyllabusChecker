@@ -44,7 +44,6 @@ def check_syllabus(file_path):
             all_text += f"\n--- Page {i} ---\n[No Text Found]\n"
 
     # Load model
-    outputs.append("\nLoading sentence transformer model...")
     model = CrossEncoder("cross-encoder/ms-marco-MiniLM-L6-v2")
 
     # Split into sentences
@@ -53,7 +52,7 @@ def check_syllabus(file_path):
         for s in re.split(r'(?<=[.!?])\s+|\n+', all_text)
         if (len(s.split()) > 3 and re.search(r"[A-Za-z]{3,}", s))
     ]
-    # ==== derive course_level from the existing parse ====
+    # derive course_level from the existing parse
     # two cases: course and course number separated by a period or underscore
     # Case A: format like CMPSC_303_*  -> we already verified parts[1][0].isdigit()
     # four or more chunks lets us know we have course_courseNum_instructor_sem
@@ -168,9 +167,6 @@ def check_syllabus(file_path):
             outputs.append("  What you did well:")
             outputs.append("    - The syllabus is written in plain, accessible language suitable for a wide range of students.")
             outputs.append("    - Instructions and expectations are straightforward and easy to understand.")
-            outputs.append("  What you could improve on:")
-            outputs.append("    - For higher-level courses, include brief explanations of key terminology or standards to add depth.")
-            outputs.append("    - Use course-specific examples or references to connect the content to real-world applications.")
         elif fk_min <= fk <= fk_max:
             outputs.append("  ✓ Matches course expectations (No penalty)")
             outputs.append("  What you did well:")
@@ -222,21 +218,21 @@ def check_syllabus(file_path):
 
         return penalty
 
-    # Content Analysis
+    # Required sections (now lists of keywords instead of one long sentence)
     required_sections = {
-        "Contact Information": "email address contact information @psu.edu",
-        "Course Materials": "required textbooks course materials readings references",
-        "Course Content and Expectations": "course outcomes objective goal expectations",
-        "Location and Meeting Times": "location meeting times class schedule room building",
-        "Course Goals and Objectives": "course objectives learning objectives goals",
-        "Grade Breakdown": "grading policy grade distribution grading scale",
-        "Examination Policy": "exams tests quizzes assessment",
-        "Attendance Policy": "attendance policy absences late arriving class participation presence",
-        "Academic Integrity Statement": "academic integrity academic honesty plagiarism cheating",
-        "Counseling Services": "counseling services mental health student support wellness",
-        "Disability Resources": "disability resources impairment adjustment accommodation ADA",
-        "Educational Equity Statement": "equity diversity inclusion accessibility accommodations non-discrimination",
-        "Campus Closure Policy": "campus closed closure weather emergency snow cancellation"
+        "Contact Information": ["email", "contact", "@psu.edu", "office hours"],
+        "Course Materials": ["textbook", "materials", "book", "required"],
+        "Course Content and Expectations": ["content", "objectives", "outcomes", "expectations"],
+        "Location and Meeting Times": ["location", "meeting", "classroom", "time"],
+        "Course Goals and Objectives": ["goals", "objectives", "learning"],
+        "Grade Breakdown": ["final", "midterm", "quiz", "participation", "grade"],
+        "Examination Policy": ["exams", "midterm", "test", "assessment"],
+        "Attendance Policy": ["attendance", "absence", "excused", "required"],
+        "Academic Integrity Statement": ["integrity", "plagiarism", "honesty"],
+        "Counseling Services": ["counseling", "mental health", "support"],
+        "Disability Resources": ["disability", "accommodation", "ADA"],
+        "Educational Equity Statement": ["equity", "diversity", "inclusion"],
+        "Campus Closure Policy": ["closure", "weather", "emergency", "canceled"]
     }
 
     # Recommendations for missing sections
@@ -273,32 +269,31 @@ def check_syllabus(file_path):
         "Campus Closure Policy": "Good thinking! Students know what to do if campus closes unexpectedly."
     }
 
-    # Calculate readability penalty
-    penalty = rate_readability(sentences, course_level)
+    # 1. CONTENT ANALYSIS (FIRST BLOCK)
+    outputs.append("\n\nCONTENT ANALYSIS REPORT")
 
-    # Initialize score
     score = 0
     threshold = 0.05
-
-    # Analyze required sections
-    outputs.append("\n\nCONTENT ANALYSIS REPORT")
     results = {}
 
-    for section, query in required_sections.items():
-        # Compare query to all sentences
-        scores = model.predict(
-            [(query.lower(), s.lower()) for s in sentences],
-            show_progress_bar=False
-        )
+    # fix to find keywords and to always add or sub if found, not found
+    for section, keywords in required_sections.items():
 
-        # Convert to probabilities
-        probs = 1 / (1 + np.exp(-scores))
+        best_score = 0
+        best_sentence = ""
+        found = False
 
-        # Get top result
-        query_results = list(zip(sentences, probs))
-        query_results.sort(key=lambda x: x[1], reverse=True)
+        for kw in keywords:
+            scores = model.predict([(kw.lower(), s.lower()) for s in sentences], show_progress_bar=False)
+            probs = 1 / (1 + np.exp(-scores))
 
-        best_sentence, best_score = query_results[0]
+            # find best match for this keyword
+            sentence, prob = sorted(zip(sentences, probs), key=lambda x: x[1], reverse=True)[0]
+
+            if prob > best_score:
+                best_score = prob
+                best_sentence = sentence
+
         found = best_score >= threshold
 
         results[section] = {
@@ -316,21 +311,21 @@ def check_syllabus(file_path):
     # Summary
     missing = [sec for sec, r in results.items() if not r["found"]]
     found_ok = [sec for sec, r in results.items() if r["found"]]
-    total_score = score + penalty
+    total_score = score
 
-    # Determine grade based on total score with some colored text
+    # 3. FINAL SUMMARY (SECOND BLOCK)
     if total_score >= 120:
         grade = "EXCELLENT"
-        grade_color = "#00A86B"  # Jade
+        grade_color = "#00FF00"  # Green
     elif total_score >= 100:
         grade = "GREAT"
         grade_color = "#00FF00"  # Green
     elif total_score >= 80:
         grade = "GOOD"
-        grade_color = "#FFFF00"  # Yellow
+        grade_color = "#00FF00"  # Green
     elif total_score >= 60:
         grade = "ADEQUATE"
-        grade_color = "#FFA500"  # Orange
+        grade_color = "#00FF00"  # Green
     else:
         grade = "INCOMPLETE"
         grade_color = "#FF0000"  # Red
@@ -341,33 +336,28 @@ def check_syllabus(file_path):
 
     if missing:
         outputs.append("\nSections Not Found:")
-        outputs.append("\nSections Not Found:")
         for sec in missing:
             outputs.append(f"  ✗ {sec}")
         outputs.append("\nSections Found:")
         for sec in found_ok:
             outputs.append(f"  ✓ {sec}")
 
-        # Add recommendations for missing sections
+    # 4. RECOMMENDATIONS (THIRD BLOCK)
+    if missing:
         outputs.append("\n\nRECOMMENDATIONS FOR SECTIONS NOT FOUND")
         for sec in missing:
             outputs.append(f"\n• {sec}:")
             outputs.append(f"  → {section_recommendations[sec]}")
 
-        # Add kudos for found sections
-        if found_ok:
-            outputs.append("\n\nKUDOS FOR SECTIONS FOUND")
-            for sec in found_ok:
-                outputs.append(f"\n• {sec}:")
-                outputs.append(f"  ✓ {section_kudos[sec]}")
-    else:
-        # Add kudos for all sections when complete
-        outputs.append("\nKUDOS - ALL SECTIONS FOUND!")
+    # 2. READABILITY REPORT (FOURTH BLOCK — PRINTED HERE)
+
+    penalty = rate_readability(sentences, course_level)
+
+    # 5. KUDOS (LAST BLOCK)
+    if found_ok:
+        outputs.append("\n\nKUDOS FOR SECTIONS FOUND")
         for sec in found_ok:
             outputs.append(f"\n• {sec}:")
             outputs.append(f"  ✓ {section_kudos[sec]}")
-
-    outputs.append(
-        "\nMore information about syllabus requirements can be found at: https://senate.psu.edu/faculty/syllabus-requirements/")
 
     return "\n".join(outputs)
