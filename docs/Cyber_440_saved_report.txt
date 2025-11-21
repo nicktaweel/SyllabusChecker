@@ -1,0 +1,118 @@
+COURSE: CYBER.440.001, INSTRUCTOR: DRENNEN, SEMESTER: FA25
+
+
+CONTENT ANALYSIS REPORT
+Contact Information                 ✓ Found     
+Course Materials                    ✓ Found     
+Course Content and Expectations     ✓ Found     
+Location and Meeting Times          ✓ Found     
+Course Goals and Objectives         ✓ Found     
+Grade Breakdown                     ✓ Found     
+Examination Policy                  ✓ Found     
+Attendance Policy                   ✓ Found     
+Academic Integrity Statement        ✗ Not Found 
+Counseling Services                 ✗ Not Found 
+Disability Resources                ✗ Not Found 
+Educational Equity Statement        ✗ Not Found 
+Campus Closure Policy               ✗ Not Found 
+
+
+FINAL SUMMARY
+GRADE: GOOD
+
+
+Sections Not Found:
+  ✗ Academic Integrity Statement
+  ✗ Counseling Services
+  ✗ Disability Resources
+  ✗ Educational Equity Statement
+  ✗ Campus Closure Policy
+
+Sections Found:
+  ✓ Contact Information
+  ✓ Course Materials
+  ✓ Course Content and Expectations
+  ✓ Location and Meeting Times
+  ✓ Course Goals and Objectives
+  ✓ Grade Breakdown
+  ✓ Examination Policy
+  ✓ Attendance Policy
+
+
+RECOMMENDATIONS FOR SECTIONS NOT FOUND
+
+• Academic Integrity Statement:
+  → Include Penn State's academic integrity policy and consequences for violations like plagiarism.
+
+• Counseling Services:
+  → Provide information about campus counseling and psychological services (CAPS) for student mental health support.
+
+• Disability Resources:
+  → Information on procedures related to academic adjustments identified by Student Disability Resources.
+
+• Educational Equity Statement:
+  → Provide information related to reporting educational bias through the report bias site.
+
+• Campus Closure Policy:
+  → Explain procedures for class cancellations due to weather, emergencies, or other campus closures.
+
+
+Flesch Reading Ease (FRE):
+  → This test measures how easy your syllabus is to read. Higher scores mean simpler, more approachable language.
+  ✓ Comfortable for college readers (No penalty)
+  What you did well:
+    - The tone and structure are balanced for most college students.
+    - Important information like grading or due dates is likely placed in accessible sections.
+    - The syllabus reads naturally, without being too casual or too formal.
+  What you could improve on:
+    - Keep paragraphs short and focused on one idea at a time.
+    - Use consistent headers and bullets to help students locate policies or deadlines faster.
+
+
+Flesch–Kincaid Grade Level (FK):
+  → This test converts your text’s difficulty into a U.S. school grade level. A higher number means a more advanced reading level.
+  ✓ Matches course expectations (No penalty)
+  What you did well:
+    - The tone balances professionalism with accessibility.
+    - Sentences likely contain enough detail to clarify expectations without overcomplicating them.
+  What you could improve on:
+    - Keep directions action-oriented (e.g., “Submit by Friday” instead of “Submissions should be made by Friday”).
+    - Limit multi-clause sentences and maintain consistent tense throughout.
+
+
+Gunning Fog Index (FOG):
+  → This test estimates how many years of education a reader needs to understand the text. Higher scores mean denser or more complex language.
+  ✓ On target for your course (No penalty)
+  What you did well:
+    - The syllabus is appropriately detailed without being overly wordy.
+    - Complex information is likely presented in clear, digestible segments.
+  What you could improve on:
+    - Continue balancing academic vocabulary with plain explanations.
+    - Use bullet lists, tables, or spacing to visually separate dense information.
+
+
+KUDOS FOR SECTIONS FOUND
+
+• Contact Information:
+  ✓ Great! Students will be able to easily reach you with questions or concerns.
+
+• Course Materials:
+  ✓ Excellent! Students know exactly what materials they need to purchase or access.
+
+• Course Content and Expectations:
+  ✓ Well done! Students have a clear understanding of what the course covers and what's expected of them.
+
+• Location and Meeting Times:
+  ✓ Perfect! Students know where and when to show up for class.
+
+• Course Goals and Objectives:
+  ✓ Fantastic! Clear learning objectives help students understand what they'll achieve in this course.
+
+• Grade Breakdown:
+  ✓ Excellent! Students can see exactly how their performance will be evaluated.
+
+• Examination Policy:
+  ✓ Great job! Students know what to expect regarding exams and assessments.
+
+• Attendance Policy:
+  ✓ Well done! Students understand your expectations regarding attendance and absences.
