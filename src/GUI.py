@@ -5,6 +5,19 @@ from tkinter import filedialog, messagebox
 from tkinter import ttk
 from PIL import Image, ImageTk
 from Syllabus_Checker_For_GUI import check_syllabus
+from reportlab.pdfgen import canvas
+
+
+def save_report_as_pdf(text, filepath):
+    c = canvas.Canvas(filepath)
+    y = 800
+    for line in text.split("\n"):
+        c.drawString(40, y, line)
+        y -= 14
+        if y < 40:
+            c.showPage()
+            y = 800
+    c.save()
 
 
 class PennStateSyllabusApp:
@@ -23,12 +36,22 @@ class PennStateSyllabusApp:
 
         self.file_path = None
 
+        # save file as a PDF
+        def save_report_as_pdf(text, filepath):
+            c = canvas.Canvas(filepath)
+            y = 800
+            for line in text.split("\n"):
+                c.drawString(40, y, line)
+                y -= 14
+                if y < 40:
+                    c.showPage()
+                    y = 800
+            c.save()
+
         # Root background
         self.root.configure(bg=self.BG_BLUE)
 
-        # ==========================================================
         #                         HEADER
-        # ==========================================================
         header = Frame(self.root, bg=self.PSU_BLUE, height=130)
         header.pack(side=TOP, fill=X)
 
@@ -108,9 +131,7 @@ class PennStateSyllabusApp:
             "Faculty Handbook:\nhttps://senate.psu.edu/faculty/syllabus-requirements/"
         ))
 
-        # ==========================================================
         #                         MAIN AREA
-        # ==========================================================
         main_frame = Frame(self.root, bg=self.BG_BLUE)
         main_frame.pack(fill=BOTH, expand=True, padx=30, pady=25)
 
@@ -200,9 +221,7 @@ class PennStateSyllabusApp:
         )
         self.file_label.grid(row=3, column=0, columnspan=3, sticky="w", pady=(12, 0))
 
-        # ==========================================================
         #                    OUTPUT / REPORT CARD
-        # ==========================================================
         output_card = Frame(main_frame, bg=self.WHITE, bd=0, relief="flat")
         output_card.pack(fill=BOTH, expand=True)
 
@@ -236,9 +255,7 @@ class PennStateSyllabusApp:
         scrollbar.pack(side=RIGHT, fill=Y)
         self.output.config(yscrollcommand=scrollbar.set)
 
-        # ==========================================================
         #                    STATUS + PROGRESS
-        # ==========================================================
         status_frame = Frame(main_frame, bg=self.BG_BLUE)
         status_frame.pack(fill=X, pady=(10, 0))
 
@@ -260,9 +277,7 @@ class PennStateSyllabusApp:
         self.progress.pack(side=RIGHT, padx=5)
         self.progress.stop()
 
-    # ==========================================================
     #                       HELPER METHODS
-    # ==========================================================
     def _add_hover_button(self, btn, bg_normal, bg_hover, fg_normal, fg_hover):
         def on_enter(e):
             btn.config(bg=bg_hover, fg=fg_hover)
@@ -319,9 +334,7 @@ class PennStateSyllabusApp:
         self.output.insert(END, "\n")
         self.output.see(END)
 
-    # ==========================================================
-    #                       MAIN ACTIONS
-    # ==========================================================
+    # MAIN ACTIONS
     def select_file(self):
         path = filedialog.askopenfilename(
             title="Select a Syllabus PDF",
@@ -385,17 +398,16 @@ class PennStateSyllabusApp:
     def save_report(self):
         text = self.output.get("1.0", END).strip()
         if not text:
-            messagebox.showinfo("No Report", "There's nothing to save.")
+            messagebox.showerror("Error", "No report to save.")
             return
 
         save_path = filedialog.asksaveasfilename(
-            defaultextension=".txt",
-            filetypes=[("Text File", "*.txt")]
+            defaultextension=".pdf",
+            filetypes=[("PDF File", "*.pdf")]
         )
         if save_path:
-            with open(save_path, "w", encoding="utf-8") as f:
-                f.write(text)
-            self._set_status("✓ Report saved", "#0E8044")
+            save_report_as_pdf(text, save_path)
+            self._set_status("✓ Report saved as PDF", "#0E8044")
 
 
 if __name__ == "__main__":
