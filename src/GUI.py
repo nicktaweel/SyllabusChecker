@@ -367,7 +367,7 @@ class PennStateSyllabusApp:
                 report = check_syllabus(self.file_path)
                 self.root.after(0, lambda: self._display_report(report))
             except Exception as e:
-                self.root.after(0, lambda: self._display_error(e))
+                self.root.after(0, lambda err=e: self._display_error(err))
 
         threading.Thread(target=worker, daemon=True).start()
 
