@@ -52,34 +52,50 @@ def check_syllabus(file_path):
         for s in re.split(r'(?<=[.!?])\s+|\n+', all_text)
         if (len(s.split()) > 3 and re.search(r"[A-Za-z]{3,}", s))
     ]
+
     # derive course_level from the existing parse
-    # two cases: course and course number separated by a period or underscore
-    # Case A: format like CMPSC_303_*  -> we already verified parts[1][0].isdigit()
-    # four or more chunks lets us know we have course_courseNum_instructor_sem
+    # normalize course numbers so that "83" becomes "083" etc.
+
+    def normalize_course_num(num):
+        # Pad course numbers to 3 digits
+        digits = re.findall(r"\d+", num)
+        if not digits:
+            return None
+        return digits[0].zfill(3)
+
+    # Case A: CMPSC_303_* ->  parts[1] contains number
     if len(parts) >= 4 and parts[1] and parts[1][0].isdigit():
-        course_num_token = parts[1]  # e.g., "303" or "201E"
-        level_char = course_num_token[0]  # '3' or '2'
-    # Case B: format like "ENG.202_*" (number sits inside `course`, e.g., "ENG.202")
+        raw_num = parts[1]  # e.g., "303", "83", "201E"
+        course_num = normalize_course_num(raw_num)
+
+    # Case B: ENG.202 or ENGL.83S
     elif course != "Unknown":
-        m = re.search(r'^[A-Za-z]{2,}\.(\d)', course)  # read the first digit immediately after the dot
+        m = re.search(r'^[A-Za-z]{2,}\.(\d+)', course)
         if not m:
             raise ValueError(
                 f"Filename pattern present but level missing in course token '{course}'. "
                 "Expected like 'ENG.202' or 'CMPSC.303'."
             )
-        level_char = m.group(1)
-    # we hard-fail if we can’t read the level
+        course_num = normalize_course_num(m.group(1))
+
     else:
         raise ValueError(
             f"Unexpected filename format for '{file_name}'. Cannot determine course level."
         )
 
-    # convert to an integer, and if its not part of our level dict, throw error
+    if course_num is None:
+        raise ValueError(f"Could not extract numeric course digits from '{file_name}'.")
+
+    # Determine course level from normalized number
+    # 083 - first digit = 0 - treat as 1 (100-level)
+    level_char = int(course_num[0])
+
+    # convert to an integer, and if its not part of the level dict, throw error
     course_level = int(level_char)
     if course_level not in (0, 1, 2, 3, 4):
         raise ValueError(
             f"Unsupported course level '{course_level}' in '{file_name}'. "
-            "Expected 1–4 (e.g., ENG.101, CMPSC_203, ENGL.302, CMPSC_463)."
+            "Expected 0–4 (e.g., BIO_004, ENG.101, CMPSC_203, ENGL.302, CMPSC_463)."
         )
 
     # Readability Analysis
