@@ -46,11 +46,12 @@ def check_syllabus(file_path):
     # Load model
     model = CrossEncoder("cross-encoder/ms-marco-MiniLM-L6-v2")
 
-    # Split into sentences
+#split into sentences
+    raw_chunks = re.split(r'(?<=[.!?])\s+|\n+', all_text)
     sentences = [
         s.strip()
-        for s in re.split(r'(?<=[.!?])\s+|\n+', all_text)
-        if (len(s.split()) > 3 and re.search(r"[A-Za-z]{3,}", s))
+        for s in raw_chunks
+        if (len(s.split()) >= 2 and re.search(r"[A-Za-z]{3,}", s))
     ]
 
     # derive course_level from the existing parse
@@ -80,11 +81,12 @@ def check_syllabus(file_path):
 
     else:
         raise ValueError(
-            f"Unexpected filename format for '{file_name}'. Cannot determine course level."
+            f"ERROR: The entered PDF '{file_name}'. is either not a syllabus or is not in the correct file format. Please review PDF and re-upload."
         )
 
     if course_num is None:
-        raise ValueError(f"Could not extract numeric course digits from '{file_name}'.")
+        raise ValueError(
+            f"Could not extract numeric course digits from '{file_name}'.")
 
     # Determine course level from normalized number
     # 083 - first digit = 0 - treat as 1 (100-level)
@@ -236,19 +238,19 @@ def check_syllabus(file_path):
 
     # Required sections (now lists of keywords instead of one long sentence)
     required_sections = {
-        "Contact Information": ["email", "contact", "@psu.edu", "office hours"],
-        "Course Materials": ["textbook", "materials", "book", "required"],
-        "Course Content and Expectations": ["content", "objectives", "outcomes", "expectations"],
-        "Location and Meeting Times": ["location", "meeting", "classroom", "time"],
-        "Course Goals and Objectives": ["goals", "objectives", "learning"],
-        "Grade Breakdown": ["final", "midterm", "quiz", "participation", "grade"],
-        "Examination Policy": ["exams", "midterm", "test", "assessment"],
-        "Attendance Policy": ["attendance", "absence", "excused", "required"],
-        "Academic Integrity Statement": ["integrity", "plagiarism", "honesty"],
-        "Counseling Services": ["counseling", "mental health", "support"],
-        "Disability Resources": ["disability", "accommodation", "ADA"],
-        "Educational Equity Statement": ["equity", "diversity", "inclusion"],
-        "Campus Closure Policy": ["closure", "weather", "emergency", "canceled"]
+        "Contact Information": ["instructor contact", "email"],
+        "Course Materials": ["textbook", "course materials", "required texts"],
+        "Course Content and Expectations": ["course content", "course expectations", "learning outcomes", "course summary"],
+        "Location and Meeting Times": ["meeting times", "class meeting", "classroom location", "class time"],
+        "Course Goals and Objectives": ["course goals", "course objectives", "learning objectives"],
+        "Grade Breakdown": ["grade breakdown", "grading scale", "final grade percentage", "grade determination", "final grade"],
+        "Examination Policy": ["examination policy", "exam policy", "makeup exam", "no makeups"],
+        "Attendance Policy": ["attendance policy", "attendance is required", "attendance will be taken"],
+        "Academic Integrity Statement": ["academic integrity", "plagiarism", "academic honesty"],
+        "Counseling Services": ["counseling and psychological services"],
+        "Disability Resources": ["student disability resources"],
+        "Educational Equity Statement": ["educational equity", "diversity and inclusion", "report bias"],
+        "Campus Closure Policy": ["campus closure", "class cancellation"]
     }
 
     # Recommendations for missing sections
@@ -285,15 +287,18 @@ def check_syllabus(file_path):
         "Campus Closure Policy": "Good thinking! Students know what to do if campus closes unexpectedly."
     }
 
+
     # 1. CONTENT ANALYSIS (FIRST BLOCK)
     outputs.append("\n\nCONTENT ANALYSIS REPORT")
 
     score = 0
-    threshold = 0.05
+    threshold = 0.4
     results = {}
+
 
     # fix to find keywords and to always add or sub if found, not found
     for section, keywords in required_sections.items():
+
 
         best_score = 0
         best_sentence = ""
@@ -310,7 +315,7 @@ def check_syllabus(file_path):
                 best_score = prob
                 best_sentence = sentence
 
-        found = best_score >= threshold
+        found = best_score >= threshold  # use section-specific threshold
 
         results[section] = {
             "found": found,
