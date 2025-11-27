@@ -104,137 +104,144 @@ def check_syllabus(file_path):
     def rate_readability(sentences, level):
         # calculates readability and then deducts points form score. we can change later just how i decided to implement for now.
         text = " ".join(sentences).strip()
-        penalty = 0
 
-        # Calculate metrics
+        # Scores
         fre = textstat.flesch_reading_ease(text)
         fk = textstat.flesch_kincaid_grade(text)
         fog = textstat.gunning_fog(text)
 
-        # dictionary to hold the different range values for readability based on course level
+        # more forgiving bounds so we do not over-flag syllabi as "difficult"
+        # FRE: (easy_threshold, ideal_min, warn_min)
+        # FK:  (ideal_min, ideal_max)
+        # FOG: (ideal_min, ideal_max)
         LEVEL = {
-            # fre uses tuple, first value is the value we set as the "easy" threshold
-            # second is our perfect spot
-            # anything lower than third is issued a penalty
-            # FK_MIN is our threshold for easy flesch kincaid
-            # FK_MAX is our limit for flesch kincaid
-            # FOG_MIN is our threshold for easy gunning fog
-            # FOG_MAX is our limit for gunning fog
-            0: {"FRE": (60, 30, 25), "FK": (12, 16), "FOG": (10, 16)},
-            1: {"FRE": (60, 30, 25), "FK": (12, 16), "FOG": (10,16)}, # for like eng 101
-            2: {"FRE": (60, 30, 20), "FK": (12, 18), "FOG": (12,18)},
-            3: {"FRE": (50, 30, 10), "FK": (12, 20), "FOG": (12,20)},
-            4: {"FRE": (40, 10, 0), "FK": (12, 25), "FOG": (12, 25)}
+            0: {"FRE": (65, 40, 25), "FK": (9, 16), "FOG": (8, 16)},
+            1: {"FRE": (60, 30, 25), "FK": (10, 18), "FOG": (10, 18)},
+            2: {"FRE": (60, 35, 20), "FK": (10, 20), "FOG": (10, 20)},
+            3: {"FRE": (50, 30, 10), "FK": (11, 22), "FOG": (10, 22)},
+            4: {"FRE": (40, 10, 0),  "FK": (12, 25), "FOG": (10, 25)}
         }
 
         fre_easy, fre_pref, fre_warn = LEVEL[level]["FRE"]
         fk_min, fk_max = LEVEL[level]["FK"]
         fog_min, fog_max = LEVEL[level]["FOG"]
 
-        # Interpret Flesch Reading Ease (FRE)
-        outputs.append("\n\nFlesch Reading Ease (FRE):")
-        outputs.append("  → This test measures how easy your syllabus is to read. "
-                       "Higher scores mean simpler, more approachable language.")
+        # pass/fail logic
+        clarity_ok = fre >= fre_pref
+        level_ok = fk_min <= fk <= fk_max
+        complexity_ok = fog_min <= fog <= fog_max
+
+        passes = sum([clarity_ok, level_ok, complexity_ok])
+
+        # result message + color
+        if passes == 3:
+            overall = "GREAT! Your syllabus is clear and easy to understand."
+            overall_color = "#00FF00"  # Green
+        elif passes == 2:
+            overall = "GOOD, BUT COULD USE SOME IMPROVEMENT."
+            overall_color = "#FFFF00"  # Yellow
+        else:
+            overall = "NEEDS IMPROVEMENT. Some parts may be difficult for students to understand."
+            overall_color = "#FF0000"  # Red
+
+        outputs.append("\n\nREADABILITY REPORT")
+        outputs.append(f"OVERALL RESULT: <color={overall_color}>{overall}</color>")
+
+        # clarity and flow will represent flesch reading ease
+        outputs.append("\nClarity and Flow:")
+        outputs.append("  → Think of this as how smoothly the syllabus reads on a first pass.")
 
         if fre >= fre_easy:
-            outputs.append("  ✓ Very easy to read (No penalty)")
-            outputs.append("  What you did well:")
-            outputs.append("    - Sentences are concise and easy to follow.")
-            outputs.append("    - The writing tone feels friendly and direct without unnecessary jargon.")
-            outputs.append("    - Sections are likely short and well-spaced, making the syllabus comfortable to skim.")
-            outputs.append("  What you could improve on:")
-            outputs.append("    - For upper-level courses, consider incorporating more discipline-specific vocabulary where appropriate.")
-            outputs.append("    - Keep the structure clear but add slightly more technical depth if the content allows.")
+            # Very easy – clear, but might be a bit simple for higher-level courses
+            outputs.append("  ✓ What you did well:")
+            outputs.append("    - Sentences are short, clear, and easy to follow.")
+            outputs.append("    - Students can quickly understand what you mean.")
+            outputs.append("  Suggestions:")
+            outputs.append("    - If this is a higher-level course, consider adding a bit more detail or discipline-specific phrasing while keeping sentences clear.")
         elif fre_pref <= fre < fre_easy:
-            outputs.append("  ✓ Comfortable for college readers (No penalty)")
-            outputs.append("  What you did well:")
-            outputs.append("    - The tone and structure are balanced for most college students.")
-            outputs.append("    - Important information like grading or due dates is likely placed in accessible sections.")
-            outputs.append("    - The syllabus reads naturally, without being too casual or too formal.")
-            outputs.append("  What you could improve on:")
-            outputs.append("    - Keep paragraphs short and focused on one idea at a time.")
-            outputs.append("    - Use consistent headers and bullets to help students locate policies or deadlines faster.")
-        elif fre_warn < fre < fre_pref:
-            outputs.append("  ⚠ Slightly challenging (Penalty: -5)")
-            outputs.append("  What you did well:")
-            outputs.append("    - The writing maintains an academic tone suited for the subject matter.")
-            outputs.append("    - Most sentences appear complete and grammatically correct.")
-            outputs.append("  What you could improve on:")
-            outputs.append("    - Shorten long sentences or divide them into two for clarity.")
-            outputs.append("    - Replace complex or abstract phrasing with direct, action-oriented language.")
-            outputs.append("    - Add bullet lists or subheadings for key sections like assignments or grading.")
-            penalty -= 5
-        else:  # fre <= fre_warn
-            outputs.append("  ✗ Hard to read (Penalty: -10)")
-            outputs.append("  What you did well:")
-            outputs.append("    - The syllabus likely conveys all required information thoroughly.")
-            outputs.append("  What you could improve on:")
-            outputs.append("    - Simplify the sentence structure and remove filler words.")
-            outputs.append("    - Break long paragraphs into shorter ones with clear headings.")
-            outputs.append("    - Avoid heavy academic wording that could confuse students.")
-            outputs.append("    - Use bullets or numbered lists to improve readability and organization.")
-            penalty -= 10
+            # Ideal zone → only kudos, no suggestions
+            outputs.append("  ✓ What you did well:")
+            outputs.append("    - The syllabus flows smoothly for college readers.")
+            outputs.append("    - Information is clear without feeling oversimplified or overly dense.")
+            outputs.append("  Keep doing what you are doing with sentence length and flow.")
+        elif fre_warn <= fre < fre_pref:
+            # Slightly challenging, but not terrible
+            outputs.append("  ✓ What you did well:")
+            outputs.append("    - You provide detailed information that reflects the rigor of the course.")
+            outputs.append("  Suggestions:")
+            outputs.append("    - Shorten or split up longer sentences so each one focuses on a single idea.")
+            outputs.append("    - Remove extra filler words or repeated phrases to make the text feel lighter.")
+        else:  # fre < fre_warn, quite hard
+            outputs.append("  ✓ What you did well:")
+            outputs.append("    - The syllabus appears thorough and covers important information.")
+            outputs.append("  Suggestions:")
+            outputs.append("    - Break up large blocks of text with headings or bullet points.")
+            outputs.append("    - Use shorter, more direct sentences for key expectations.")
+            outputs.append("    - Put the most important point at the beginning of the sentence whenever possible.")
 
-        # Interpret Flesch-Kincaid Grade Level (FK)
-        outputs.append("\n\nFlesch–Kincaid Grade Level (FK):")
-        outputs.append("  → This test converts your text’s difficulty into a U.S. school grade level. "
-                       "A higher number means a more advanced reading level.")
+        # is it appropriate for course level? --> going to represent flesch kincaid grade
+        outputs.append("\nAppropriate for Course Level:")
+        outputs.append("  → Think of this as whether the reading feels like it matches a course at this level.")
 
-        if fk < fk_min:
-            outputs.append("  ✓ Easy to follow (No penalty)")
-            outputs.append("  What you did well:")
-            outputs.append("    - The syllabus is written in plain, accessible language suitable for a wide range of students.")
-            outputs.append("    - Instructions and expectations are straightforward and easy to understand.")
-        elif fk_min <= fk <= fk_max:
-            outputs.append("  ✓ Matches course expectations (No penalty)")
-            outputs.append("  What you did well:")
-            outputs.append("    - The tone balances professionalism with accessibility.")
-            outputs.append("    - Sentences likely contain enough detail to clarify expectations without overcomplicating them.")
-            outputs.append("  What you could improve on:")
-            outputs.append("    - Keep directions action-oriented (e.g., “Submit by Friday” instead of “Submissions should be made by Friday”).")
-            outputs.append("    - Limit multi-clause sentences and maintain consistent tense throughout.")
-        else:  # fk > fk_max
-            outputs.append("  ✗ Too advanced for most students (Penalty: -10)")
-            outputs.append("  What you did well:")
-            outputs.append("    - The writing demonstrates a strong academic tone and attention to detail.")
-            outputs.append("  What you could improve on:")
-            outputs.append("    - Simplify clause-heavy sentences and use direct verbs instead of nominalized phrases (e.g., “evaluation of” → “evaluate”).")
-            outputs.append("    - Reduce technical jargon or define it briefly where necessary.")
-            outputs.append("    - Reorder long sentences so the action appears near the beginning.")
-            penalty -= 10
+        if level_ok:
+            # Ideal FK range → only kudos
+            outputs.append("  ✓ What you did well:")
+            outputs.append("    - The reading level fits what we expect for this course level.")
+            outputs.append("    - The tone feels professional while still being accessible to students.")
+            outputs.append("  Keep this balance of academic language and clarity.")
+        elif fk < fk_min:
+            # Too simple for the level
+            outputs.append("  ✓ What you did well:")
+            outputs.append("    - The syllabus is very accessible and friendly to read.")
+            outputs.append("  Suggestions:")
+            outputs.append("    - Add a bit more academic or discipline-specific language where it helps clarify expectations.")
+            outputs.append("    - Provide slightly more detail in key sections, such as major assignments or grading criteria.")
+        else:  # fk > fk_max, too advanced
+            outputs.append("  ✓ What you did well:")
+            outputs.append("    - The writing reflects a serious, academic tone appropriate for higher education.")
+            outputs.append("  Suggestions:")
+            outputs.append("    - Simplify longer or highly formal sentences, especially in policy-heavy areas.")
+            outputs.append("    - Make instructions and deadlines as direct and straightforward as possible.")
+            outputs.append("    - Briefly define specialized terms when they first appear.")
 
-        # Interpret Gunning Fog Index (FOG)
-        outputs.append("\n\nGunning Fog Index (FOG):")
-        outputs.append("  → This test estimates how many years of education a reader needs to understand the text. "
-                       "Higher scores mean denser or more complex language.")
+        # word choice and complexity will represent gunning fog index
+        outputs.append("\nWord Choice and Complexity:")
+        outputs.append("  → Think of this as how heavy the wording feels, based on sentence length and bigger words.")
 
         if fog < fog_min:
-            outputs.append("  ✓ Very easy to understand (No penalty)")
-            outputs.append("  What you did well:")
-            outputs.append("    - The syllabus is straightforward and free of unnecessary complexity.")
-            outputs.append("    - Students can likely locate and understand essential information with minimal effort.")
-            outputs.append("  What you could improve on:")
-            outputs.append("    - If this is an upper-level course, introduce concise technical terms to align with subject expectations.")
-            outputs.append("    - Ensure any added detail still maintains clarity and directness.")
+            # Very simple wording
+            outputs.append("  ✓ What you did well:")
+            outputs.append("    - Vocabulary is straightforward and easy to understand.")
+            outputs.append("    - Students can quickly grasp what you are saying without getting stuck on the wording.")
+            outputs.append("  Suggestions:")
+            outputs.append("    - For upper-level or writing-intensive courses, consider adding key discipline-specific terms where appropriate.")
+            outputs.append("    - Make sure important concepts are described with enough precision, even while staying clear.")
         elif fog_min <= fog <= fog_max:
-            outputs.append("  ✓ On target for your course (No penalty)")
-            outputs.append("  What you did well:")
-            outputs.append("    - The syllabus is appropriately detailed without being overly wordy.")
-            outputs.append("    - Complex information is likely presented in clear, digestible segments.")
-            outputs.append("  What you could improve on:")
-            outputs.append("    - Continue balancing academic vocabulary with plain explanations.")
-            outputs.append("    - Use bullet lists, tables, or spacing to visually separate dense information.")
-        else:  # fog > fog_max
-            outputs.append("  ✗ Too complex or dense (Penalty: -10)")
-            outputs.append("  What you did well:")
-            outputs.append("    - The writing conveys expertise and comprehensive coverage of the course.")
-            outputs.append("  What you could improve on:")
-            outputs.append("    - Shorten long sentences and avoid excessive multi-syllabic words.")
-            outputs.append("    - Simplify nested clauses and use punctuation strategically to improve pacing.")
-            outputs.append("    - Rework dense paragraphs into shorter, clearly labeled sections so students can skim key information.")
-            penalty -= 10
+            # Ideal zone → only kudos
+            outputs.append("  ✓ What you did well:")
+            outputs.append("    - Word choice feels balanced: not too simple, but not overly dense.")
+            outputs.append("    - Complex ideas are explained in a way that students can process without feeling overwhelmed.")
+            outputs.append("  Keep this mix of everyday language and necessary academic terms.")
+        else:  # fog > fog_max, too dense
+            outputs.append("  ✓ What you did well:")
+            outputs.append("    - The syllabus shows strong command of the subject and covers a lot of information.")
+            outputs.append("  Suggestions:")
+            outputs.append("    - Replace very long or technical words with simpler alternatives when possible.")
+            outputs.append("    - Shorten dense sections and avoid packing too many ideas into a single sentence.")
+            outputs.append("    - Use bullet points or numbered lists for complex rules or multi-step processes.")
 
-        return penalty
+
+        # if at most 1 test passes, then we add more overall suggestions for user.
+        if passes <= 1:
+            outputs.append("\nOverall Suggestions:")
+            outputs.append("  • Use bullet points for key policies, deadlines, and grading details.")
+            outputs.append("  • Add clear section headers so students can quickly find what they need.")
+            outputs.append("  • Keep the most important rules short, direct, and easy to scan.")
+
+        return
+################################################################################################
+
+
 
     # Required sections (now lists of keywords instead of one long sentence)
     required_sections = {
@@ -372,7 +379,7 @@ def check_syllabus(file_path):
 
     # 2. READABILITY REPORT (FOURTH BLOCK — PRINTED HERE)
 
-    penalty = rate_readability(sentences, course_level)
+    rate_readability(sentences, course_level)
 
     # 5. KUDOS (LAST BLOCK)
     if found_ok:
