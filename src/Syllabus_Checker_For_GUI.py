@@ -244,11 +244,11 @@ def check_syllabus(file_path):
         "Location and Meeting Times": ["meeting times", "class meeting", "classroom location", "class time"],
         "Course Goals and Objectives": ["course goals", "course objectives", "learning objectives"],
         "Grade Breakdown": ["grade breakdown", "grading scale", "final grade percentage", "grade determination", "final grade"],
-        "Examination Policy": ["examination policy", "exam policy", "makeup exam", "no makeups"],
-        "Attendance Policy": ["attendance policy", "attendance is required", "attendance will be taken"],
+        "Examination Policy": ["examination policy", "exam policy", "makeup exam", "no makeups", "exams", "quizzes"],
+        "Attendance Policy": ["attendance policy", "attendance is required", "attendance will be taken", "attend"],
         "Academic Integrity Statement": ["academic integrity", "plagiarism", "academic honesty"],
         "Counseling Services": ["counseling and psychological services"],
-        "Disability Resources": ["student disability resources"],
+        "Disability Resources": ["student disability resources", "disabilities", "accommodations"],
         "Educational Equity Statement": ["educational equity", "diversity and inclusion", "report bias"],
         "Campus Closure Policy": ["campus closure", "class cancellation"]
     }
