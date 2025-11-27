@@ -6,17 +6,41 @@ from tkinter import ttk
 from PIL import Image, ImageTk
 from Syllabus_Checker_For_GUI import check_syllabus
 from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfbase.pdfmetrics import stringWidth
 
-
+# save file as a PDF
 def save_report_as_pdf(text, filepath):
-    c = canvas.Canvas(filepath)
-    y = 800
+    c = canvas.Canvas(filepath, pagesize=letter)
+    width, height = letter
+
+    left_margin = 40
+    right_margin = 40
+    usable_width = width - left_margin - right_margin
+
+    y = height - 40
+    line_height = 14
+
     for line in text.split("\n"):
-        c.drawString(40, y, line)
-        y -= 14
-        if y < 40:
-            c.showPage()
-            y = 800
+        # wrap based on pixel width, not characters since some of our lines use icons or are really long
+        wrapped = []
+        current = ""
+        for word in line.split():
+            test = (current + " " + word).strip()
+            if stringWidth(test, "Helvetica", 12) <= usable_width:
+                current = test
+            else:
+                wrapped.append(current)
+                current = word
+        wrapped.append(current)
+
+        for wline in wrapped:
+            c.drawString(left_margin, y, wline)
+            y -= line_height
+            if y < 40:
+                c.showPage()
+                y = height - 40
+
     c.save()
 
 
@@ -35,18 +59,6 @@ class PennStateSyllabusApp:
         self.ACCENT = "#FFCC00"
 
         self.file_path = None
-
-        # save file as a PDF
-        def save_report_as_pdf(text, filepath):
-            c = canvas.Canvas(filepath)
-            y = 800
-            for line in text.split("\n"):
-                c.drawString(40, y, line)
-                y -= 14
-                if y < 40:
-                    c.showPage()
-                    y = 800
-            c.save()
 
         # Root background
         self.root.configure(bg=self.BG_BLUE)
