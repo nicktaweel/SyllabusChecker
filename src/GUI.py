@@ -9,37 +9,51 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfbase.pdfmetrics import stringWidth
 
-# save file as a PDF
+
 def save_report_as_pdf(text, filepath):
     c = canvas.Canvas(filepath, pagesize=letter)
     width, height = letter
 
-    left_margin = 40
-    right_margin = 40
+    left_margin = 50
+    right_margin = 50
     usable_width = width - left_margin - right_margin
 
-    y = height - 40
-    line_height = 14
+    y = height - 60
+    line_height = 19
+    font_size = 15
+
+    c.setFont("Helvetica", font_size)
 
     for line in text.split("\n"):
-        # wrap based on pixel width, not characters since some of our lines use icons or are really long
         wrapped = []
         current = ""
         for word in line.split():
             test = (current + " " + word).strip()
-            if stringWidth(test, "Helvetica", 12) <= usable_width:
+            if stringWidth(test, "Helvetica", font_size) <= usable_width:
                 current = test
             else:
-                wrapped.append(current)
+                if current:
+                    wrapped.append(current)
                 current = word
-        wrapped.append(current)
+        if current:
+            wrapped.append(current)
+
+        if not wrapped:
+            # blank line
+            y -= line_height
+            if y < 60:
+                c.showPage()
+                c.setFont("Helvetica", font_size)
+                y = height - 60
+            continue
 
         for wline in wrapped:
             c.drawString(left_margin, y, wline)
             y -= line_height
-            if y < 40:
+            if y < 60:
                 c.showPage()
-                y = height - 40
+                c.setFont("Helvetica", font_size)
+                y = height - 60
 
     c.save()
 
@@ -51,19 +65,18 @@ class PennStateSyllabusApp:
         self.root.geometry("1200x800")
         self.root.minsize(900, 650)
 
-        # MAIN COLORS
-        self.BG_BLUE = "#74AADD"      # page background
-        self.WHITE = "#FFFFFF"
+        # Softer colors
+        self.BG_BLUE = "#E6EEF7"      # pale blue background
+        self.WHITE = "#F3F4F6"        # soft card background
         self.PSU_BLUE = "#002D72"
         self.PSU_NAV = "#003B8E"
         self.ACCENT = "#FFCC00"
 
         self.file_path = None
 
-        # Root background
         self.root.configure(bg=self.BG_BLUE)
 
-        #                         HEADER
+        # ======================= HEADER ==========================
         header = Frame(self.root, bg=self.PSU_BLUE, height=130)
         header.pack(side=TOP, fill=X)
 
@@ -78,7 +91,10 @@ class PennStateSyllabusApp:
             self.lion_icon = ImageTk.PhotoImage(img)
             Label(lion_holder, image=self.lion_icon, bg=self.PSU_BLUE).pack()
         else:
-            Label(lion_holder, text="🦁", font=("Segoe UI", 48), bg=self.PSU_BLUE, fg=self.WHITE).pack()
+            Label(lion_holder, text="🦁",
+                  font=("Segoe UI", 48),
+                  bg=self.PSU_BLUE,
+                  fg=self.WHITE).pack()
 
         # Title & subtitle (center)
         title_frame = Frame(header, bg=self.PSU_BLUE)
@@ -87,15 +103,15 @@ class PennStateSyllabusApp:
         Label(
             title_frame,
             text="Penn State Syllabus Checker",
-            font=("Segoe UI", 24, "bold"),
+            font=("Segoe UI", 26, "bold"),
             bg=self.PSU_BLUE,
             fg=self.WHITE
-        ).pack(anchor="w", pady=(20, 0))
+        ).pack(anchor="w", pady=(18, 0))
 
         Label(
             title_frame,
             text="CMPSC 487W — Penn State Abington",
-            font=("Segoe UI", 13),
+            font=("Segoe UI", 16),
             bg=self.PSU_BLUE,
             fg="#D0E4FF"
         ).pack(anchor="w", pady=(4, 10))
@@ -107,18 +123,17 @@ class PennStateSyllabusApp:
         about_btn = Label(
             nav_frame, text="About",
             fg=self.WHITE, bg=self.PSU_BLUE,
-            font=("Segoe UI", 14, "bold"), cursor="hand2"
+            font=("Segoe UI", 15, "bold"), cursor="hand2"
         )
         help_btn = Label(
             nav_frame, text="Help",
             fg=self.WHITE, bg=self.PSU_BLUE,
-            font=("Segoe UI", 14, "bold"), cursor="hand2"
+            font=("Segoe UI", 15, "bold"), cursor="hand2"
         )
 
         about_btn.pack(side=LEFT, padx=15)
         help_btn.pack(side=LEFT, padx=15)
 
-        # Hover effect for nav labels
         self._add_hover_label(about_btn, self.WHITE, "#FFEE88")
         self._add_hover_label(help_btn, self.WHITE, "#FFEE88")
 
@@ -143,22 +158,21 @@ class PennStateSyllabusApp:
             "Faculty Handbook:\nhttps://senate.psu.edu/faculty/syllabus-requirements/"
         ))
 
-        #                         MAIN AREA
+        # ======================= MAIN AREA =======================
         main_frame = Frame(self.root, bg=self.BG_BLUE)
         main_frame.pack(fill=BOTH, expand=True, padx=30, pady=25)
 
-        # -------------------- CONTROL CARD ------------------------
+        # -------------------- CONTROL CARD -----------------------
         control_card = Frame(main_frame, bg=self.WHITE, bd=0, relief="flat")
         control_card.pack(fill=X, pady=(0, 15))
 
-        # Card top border (fake rounded look with padding)
         control_inner = Frame(control_card, bg=self.WHITE)
         control_inner.pack(fill=X, padx=18, pady=18)
 
         Label(
             control_inner,
             text="Upload and Analyze Your Syllabus",
-            font=("Segoe UI", 18, "bold"),
+            font=("Segoe UI", 20, "bold"),
             bg=self.WHITE,
             fg=self.PSU_BLUE
         ).grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 10))
@@ -166,7 +180,7 @@ class PennStateSyllabusApp:
         Label(
             control_inner,
             text="Select a PDF syllabus file, then click Analyze to generate a report.",
-            font=("Segoe UI", 11),
+            font=("Segoe UI", 15),
             bg=self.WHITE,
             fg="#444444"
         ).grid(row=1, column=0, columnspan=3, sticky="w", pady=(0, 15))
@@ -207,8 +221,8 @@ class PennStateSyllabusApp:
             btn_row,
             text="💾  Save Report",
             font=("Segoe UI", 16, "bold"),
-            bg="#F5F5F5",
-            fg="#333333",
+            bg="#E5E7EB",
+            fg="#222222",
             relief="flat",
             padx=18,
             pady=8,
@@ -217,23 +231,22 @@ class PennStateSyllabusApp:
         )
         self.save_btn.pack(side=LEFT, padx=10)
 
-        # Hover styling for buttons
         self._add_hover_button(self.select_btn, self.PSU_BLUE, "#1D4E9E", self.WHITE, self.WHITE)
         self._add_hover_button(self.analyze_btn, "#0E8044", "#0A5C31", self.WHITE, self.WHITE)
-        self._add_hover_button(self.save_btn, "#F5F5F5", "#E2E2E2", "#333333", "#000000")
+        self._add_hover_button(self.save_btn, "#E5E7EB", "#D1D5DB", "#222222", "#000000")
 
         # File label
         self.file_label = Label(
             control_inner,
             text="No file selected",
-            font=("Segoe UI", 11),
+            font=("Segoe UI", 15),
             bg=self.WHITE,
             fg="#666666",
             anchor="w"
         )
         self.file_label.grid(row=3, column=0, columnspan=3, sticky="w", pady=(12, 0))
 
-        #                    OUTPUT / REPORT CARD
+        # ---------------- OUTPUT / REPORT CARD -------------------
         output_card = Frame(main_frame, bg=self.WHITE, bd=0, relief="flat")
         output_card.pack(fill=BOTH, expand=True)
 
@@ -243,21 +256,20 @@ class PennStateSyllabusApp:
         Label(
             output_inner,
             text="Syllabus Analysis Report",
-            font=("Segoe UI", 15, "bold"),
+            font=("Segoe UI", 17, "bold"),
             bg=self.WHITE,
             fg=self.PSU_BLUE
         ).pack(anchor="w", pady=(0, 8))
 
-        # Output Text + Scrollbar
         text_frame = Frame(output_inner, bg=self.WHITE)
         text_frame.pack(fill=BOTH, expand=True, pady=(5, 0))
 
         self.output = Text(
             text_frame,
             wrap=WORD,
-            font=("Consolas", 11),
-            bg="#FAFAFA",
-            fg="#111111",
+            font=("Segoe UI", 15),
+            bg="#F5F5F7",      # softer off-white
+            fg="#222222",
             relief="flat",
             bd=0
         )
@@ -267,14 +279,14 @@ class PennStateSyllabusApp:
         scrollbar.pack(side=RIGHT, fill=Y)
         self.output.config(yscrollcommand=scrollbar.set)
 
-        #                    STATUS + PROGRESS
+        # ---------------- STATUS + PROGRESS ----------------------
         status_frame = Frame(main_frame, bg=self.BG_BLUE)
         status_frame.pack(fill=X, pady=(10, 0))
 
         self.status = Label(
             status_frame,
             text="Ready",
-            font=("Segoe UI", 11),
+            font=("Segoe UI", 15),
             bg=self.BG_BLUE,
             fg=self.PSU_BLUE,
             anchor="w"
@@ -289,7 +301,7 @@ class PennStateSyllabusApp:
         self.progress.pack(side=RIGHT, padx=5)
         self.progress.stop()
 
-    #                       HELPER METHODS
+    # ----------------- HELPER METHODS ---------------------------
     def _add_hover_button(self, btn, bg_normal, bg_hover, fg_normal, fg_hover):
         def on_enter(e):
             btn.config(bg=bg_hover, fg=fg_hover)
@@ -317,16 +329,11 @@ class PennStateSyllabusApp:
         self.root.update_idletasks()
 
     def _insert_rich_text(self, msg):
-        """
-        Parse <color=#RRGGBB>...</color> tags and insert with tags.
-        Everything else is plain text.
-        """
         import re
         pattern = r'<color=(#[0-9A-Fa-f]{6})>(.*?)</color>'
         pos = 0
         for match in re.finditer(pattern, msg, flags=re.S):
             start, end = match.span()
-            # plain chunk
             if start > pos:
                 self.output.insert(END, msg[pos:start])
 
@@ -335,7 +342,7 @@ class PennStateSyllabusApp:
 
             tag_name = f"color_{color}"
             if tag_name not in self.output.tag_names():
-                self.output.tag_config(tag_name, foreground=color, font=("Consolas", 11, "bold"))
+                self.output.tag_config(tag_name, foreground=color, font=("Segoe UI", 15, "bold"))
 
             self.output.insert(END, text, tag_name)
             pos = end
@@ -344,9 +351,9 @@ class PennStateSyllabusApp:
             self.output.insert(END, msg[pos:])
 
         self.output.insert(END, "\n")
-        self.output.see(END)
+        # IMPORTANT: do NOT self.output.see(END) here – we want to stay at the top
 
-    # MAIN ACTIONS
+    # ------------------ MAIN ACTIONS ----------------------------
     def select_file(self):
         path = filedialog.askopenfilename(
             title="Select a Syllabus PDF",
@@ -369,7 +376,6 @@ class PennStateSyllabusApp:
         self._set_status("Analyzing syllabus...", self.ACCENT)
         self.progress.start(10)
 
-        # Disable buttons during analysis
         self.analyze_btn.config(state=DISABLED)
         self.select_btn.config(state=DISABLED)
         self.save_btn.config(state=DISABLED)
@@ -390,7 +396,9 @@ class PennStateSyllabusApp:
         self.output.delete("1.0", END)
         self._insert_rich_text(report)
 
-        # Re-enable buttons
+        # Scroll to top so user sees the beginning, not the bottom
+        self.output.yview_moveto(0.0)
+
         self.analyze_btn.config(state=NORMAL)
         self.select_btn.config(state=NORMAL)
         self.save_btn.config(state=NORMAL)
@@ -401,8 +409,8 @@ class PennStateSyllabusApp:
 
         self.output.delete("1.0", END)
         self.output.insert(END, f"Error during analysis:\n\n{error}")
+        self.output.yview_moveto(0.0)
 
-        # Re-enable buttons
         self.analyze_btn.config(state=NORMAL)
         self.select_btn.config(state=NORMAL)
         self.save_btn.config(state=NORMAL)
