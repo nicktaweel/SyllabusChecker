@@ -85,8 +85,8 @@ class PennStateSyllabusApp:
         lion_holder = Frame(header, bg=self.PSU_BLUE)
         lion_holder.pack(side=LEFT, padx=20, pady=10)
 
-        if os.path.exists("lion.png"):
-            img = Image.open("lion.png")
+        if os.path.exists("../docs/lion.png"):
+            img = Image.open("../docs/lion.png")
             img = img.resize((110, 110), Image.LANCZOS)
             self.lion_icon = ImageTk.PhotoImage(img)
             Label(lion_holder, image=self.lion_icon, bg=self.PSU_BLUE).pack()
